@@ -10,9 +10,6 @@
 namespace lb {
 
 class Argument : public Value {
-protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) override;
-  
 public:
   Argument(const llvm::Argument& llvm_arg,
            Module& module);

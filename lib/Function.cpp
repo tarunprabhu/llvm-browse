@@ -21,16 +21,6 @@ Function::Function(const llvm::Function& llvm_f, Module& module) :
     bbs.push_back(&module.add<BasicBlock>(bb));
 }
 
-void
-Function::init(llvm::ModuleSlotTracker& slots) {
-  const llvm::Function& f = get_llvm();
-  slots.incorporateFunction(f);
-  for(const llvm::Argument& arg : f.args())
-    module.get<Argument>(arg).init(slots);
-  for(const llvm::BasicBlock& bb : f)
-    module.get<BasicBlock>(bb).init(slots);
-}
-
 Function::Iterator
 Function::begin() const {
   return bbs.cbegin();

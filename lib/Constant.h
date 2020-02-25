@@ -10,9 +10,6 @@
 namespace lb {
 
 class Constant : public Value {
-protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) override;
-  
 public:
   Constant(const llvm::Constant& llvm, Module& module);
   virtual ~Constant() = default;

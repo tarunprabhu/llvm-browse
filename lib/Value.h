@@ -27,7 +27,6 @@ protected:
   Kind kind;
 
 protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) = 0;
   Value(Kind kind, const llvm::Value& llvm, Module& module);
 
 public:

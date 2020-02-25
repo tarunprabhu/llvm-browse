@@ -23,9 +23,6 @@ protected:
 public:
   using Iterator = decltype(bbs)::const_iterator;
 
-protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) override;
-
 public:
   Function(const llvm::Function& llvm_f,
            Module& module);

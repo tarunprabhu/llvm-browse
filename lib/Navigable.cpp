@@ -17,6 +17,11 @@ Navigable::set_tag(int slot) {
 }
 
 void
+Navigable::set_tag(llvm::StringRef name) {
+  tag = name;
+}
+  
+void
 Navigable::set_tag(llvm::StringRef name,
                    llvm::StringRef prefix,
                    bool may_need_quotes) {
@@ -26,6 +31,11 @@ Navigable::set_tag(llvm::StringRef name,
     tag = String::concat(prefix, name);
 }
 
+void
+Navigable::set_defn_range(const SourceRange& range) {
+  defn = range;
+}
+  
 void
 Navigable::set_llvm_range(const SourceRange& range) {
   llvm = range;
@@ -41,6 +51,11 @@ Navigable::get_tag() const {
   return llvm::StringRef(tag);
 }
 
+const SourceRange&
+Navigable::get_defn_range() const {
+  return defn;
+}
+  
 const SourceRange&
 Navigable::get_llvm_range() const {
   return llvm;

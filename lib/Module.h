@@ -11,15 +11,17 @@
 #include "Errors.h"
 #include "SourceFile.h"
 #include "StructType.h"
+#include "Typedefs.h"
 #include "Value.h"
 
 namespace lb {
 
+class Argument;
+class BasicBlock;
+class Instruction;
 class Function;
 class GlobalVariable;
 class Value;
-
-using BufferId = uint64_t;
 
 // Wrapper class around an LLVM module. The wrappers around the LLVM classes
 // contains "LLVM source code" information, mainly just line and column
@@ -40,24 +42,25 @@ protected:
   std::map<const llvm::Value*, Value*> vmap;
   std::map<llvm::StructType*, StructType*> tmap;
   bool valid;
-  
+
 public:
   using FunctionIterator   = decltype(fptrs)::const_iterator;
   using GlobalIterator     = decltype(gptrs)::const_iterator;
   using StructTypeIterator = decltype(sptrs)::const_iterator;
 
 protected:
-  static constexpr BufferId get_invalid_id() {
-    return -1;
-  }
-  
-  static constexpr BufferId get_main_id() {
-    return 0;
+  Module(std::unique_ptr<llvm::Module> module, llvm::LLVMContext& context);
+  BufferId get_next_available_id();
+
+  template<typename T = Value>
+  T& get(const llvm::Value& llvm) {
+    return *llvm::cast<T>(vmap.at(&llvm));
   }
 
-protected:
-  Module(std::unique_ptr<llvm::Module> module, llvm::LLVMContext& context);
-  BufferId get_next_available_id();  
+  template<typename T = Value>
+  const T& get(const llvm::Value& llvm) const {
+    return *llvm::cast<T>(vmap.at(&llvm));
+  }
 
 public:
   Module(const Module&)  = delete;
@@ -84,18 +87,21 @@ public:
     vmap[&llvm] = ptr;
     return *ptr;
   }
-  
-  template<typename T = Value>
-  T& get(const llvm::Value& llvm) {
-    return *llvm::cast<T>(vmap.at(&llvm));
-  }
 
-  template<typename T = Value>
-  const T& get(const llvm::Value& llvm) const {
-    return *llvm::cast<T>(vmap.at(&llvm));
-  }
-
+  StructType& get(llvm::StructType* llvm);
+  Argument& get(const llvm::Argument& llvm);
+  BasicBlock& get(const llvm::BasicBlock& llvm);
+  Instruction& get(const llvm::Instruction& llvm);
+  Function& get(const llvm::Function& llvm);
+  GlobalVariable& get(const llvm::GlobalVariable& llvm);
+  Value& get(const llvm::Value& llvm);
   const StructType& get(llvm::StructType* llvm) const;
+  const Argument& get(const llvm::Argument& llvm) const;
+  const BasicBlock& get(const llvm::BasicBlock& llvm) const;
+  const Instruction& get(const llvm::Instruction& llvm) const;
+  const Function& get(const llvm::Function& llvm) const;
+  const GlobalVariable& get(const llvm::GlobalVariable& llvm) const;
+  const Value& get(const llvm::Value& llvm) const;
 
   template<typename T, typename LLVM>
   const T& get_or_insert(const LLVM& llvm) {
@@ -121,6 +127,14 @@ public:
 public:
   static std::unique_ptr<Module> create(const std::string& file,
                                         llvm::LLVMContext& context);
+
+  static constexpr BufferId get_invalid_id() {
+    return -1;
+  }
+
+  static constexpr BufferId get_main_id() {
+    return 0;
+  }
 };
 
 } // namespace lb

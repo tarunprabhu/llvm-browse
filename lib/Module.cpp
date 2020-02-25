@@ -1,6 +1,9 @@
 #include "Module.h"
+#include "Argument.h"
+#include "BasicBlock.h"
 #include "Function.h"
 #include "GlobalVariable.h"
+#include "Instruction.h"
 #include "Parser.h"
 #include "StructType.h"
 
@@ -89,9 +92,74 @@ Module::add_main(std::unique_ptr<llvm::MemoryBuffer> mbuf) {
   return id;
 }
 
+StructType&
+Module::get(llvm::StructType* llvm) {
+  return *tmap.at(llvm);
+}
+
+Argument&
+Module::get(const llvm::Argument& llvm) {
+  return get<Argument>(llvm);
+}
+
+BasicBlock&
+Module::get(const llvm::BasicBlock& llvm) {
+  return get<BasicBlock>(llvm);
+}
+
+Instruction&
+Module::get(const llvm::Instruction& llvm) {
+  return get<Instruction>(llvm);
+}
+
+Function&
+Module::get(const llvm::Function& llvm) {
+  return get<Function>(llvm);
+}
+
+GlobalVariable&
+Module::get(const llvm::GlobalVariable& llvm) {
+  return get<GlobalVariable>(llvm);
+}
+
+Value&
+Module::get(const llvm::Value& llvm) {
+  return get<Value>(llvm);
+}
+
 const StructType&
 Module::get(llvm::StructType* llvm) const {
   return *tmap.at(llvm);
+}
+
+const Argument&
+Module::get(const llvm::Argument& llvm) const {
+  return get<Argument>(llvm);
+}
+
+const BasicBlock&
+Module::get(const llvm::BasicBlock& llvm) const {
+  return get<BasicBlock>(llvm);
+}
+
+const Instruction&
+Module::get(const llvm::Instruction& llvm) const {
+  return get<Instruction>(llvm);
+}
+
+const Function&
+Module::get(const llvm::Function& llvm) const {
+  return get<Function>(llvm);
+}
+
+const GlobalVariable&
+Module::get(const llvm::GlobalVariable& llvm) const {
+  return get<GlobalVariable>(llvm);
+}
+
+const Value&
+Module::get(const llvm::Value& llvm) const {
+  return get<Value>(llvm);
 }
 
 llvm::MemoryBufferRef

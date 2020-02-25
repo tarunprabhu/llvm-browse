@@ -26,23 +26,29 @@ namespace lb {
 class Navigable {
 protected:
   std::string tag;
+  SourceRange defn;
   SourceRange llvm;
   SourceRange source;
 
 protected:
   Navigable() = default;
 
-  void set_tag(int slot);
-  void set_tag(llvm::StringRef name,
-               llvm::StringRef prefix,
-               bool may_need_quotes = true);
-  void set_llvm_range(const SourceRange& range);
-  void set_source_range(const SourceRange& range);
 
 public:
   virtual ~Navigable() = default;
 
+  void set_tag(int slot);
+  void set_tag(llvm::StringRef name);
+  void set_tag(llvm::StringRef name,
+               llvm::StringRef prefix,
+               bool may_need_quotes = true);
+
+  void set_defn_range(const SourceRange& range);
+  void set_llvm_range(const SourceRange& range);
+  void set_source_range(const SourceRange& range);
+  
   llvm::StringRef get_tag() const;
+  const SourceRange& get_defn_range() const;
   const SourceRange& get_llvm_range() const;
   const SourceRange& get_source_range() const;
 };

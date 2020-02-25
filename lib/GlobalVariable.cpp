@@ -18,11 +18,6 @@ GlobalVariable::GlobalVariable(const llvm::GlobalVariable& llvm_g,
     llvm::errs() << "UNSUPPORTED: Unnamed globals: " << llvm_g << "\n";
 }
 
-void
-GlobalVariable::init(llvm::ModuleSlotTracker& slots) {
-  ;
-}
-
 const llvm::GlobalVariable&
 GlobalVariable::get_llvm() const {
   return cast<llvm::GlobalVariable>(llvm);

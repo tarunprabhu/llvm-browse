@@ -1,28 +1,31 @@
 #ifndef LLVM_BROWSE_SOURCE_RANGE_H
 #define LLVM_BROWSE_SOURCE_RANGE_H
 
-#include <stdint.h>
 #include <string>
+
+#include <llvm/ADT/StringRef.h>
+
+#include "Typedefs.h"
 
 namespace lb {
 
-class SourceFile;
+class Module;
 
 class SourceRange {
 protected:
-  const SourceFile* file;
-  uint64_t begin;
-  uint64_t end;
+  BufferId id;
+  size_t begin;
+  size_t end;
 
 public:
-  SourceRange() = default;
-  SourceRange(const SourceFile& file, uint64_t begin, uint64_t end);
+  SourceRange();
+  SourceRange(BufferId id, size_t begin, size_t end);
   virtual ~SourceRange() = default;
 
-  const SourceFile& get_file() const;
-  uint64_t get_begin() const;
-  uint64_t get_end() const;
-  std::string get_text() const;
+  bool is_valid() const;
+  size_t get_begin() const;
+  size_t get_end() const;
+  llvm::StringRef get_text(const Module& module) const;
 };
 
 } // namespace lb

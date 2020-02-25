@@ -24,18 +24,38 @@ class Module;
 //
 class Parser {
 protected:
+  // When determining the locations for the various entities, we need to look
+  // at the previous character to make sure that we don't have any false
+  // matches
+  enum class Lookback {
+    // Doesn't matter what the previous char is
+    Any,
+
+    // The previous character must be a newline because the string has to match
+    // at the start of a line
+    Newline,
+
+    // Whitespace. This subsumes Newline
+    Whitespace,
+
+    // There should be one or more whitespaces until a newline with
+    // no intervening non-whitespace characters
+    Indent,
+  };
+
+protected:
   std::unique_ptr<llvm::ModuleSlotTracker> local_slots;
   std::unique_ptr<llvm::SlotMapping> global_slots;
   llvm::StringRef ir;
 
 protected:
   size_t find(llvm::StringRef key,
-              bool at_start,
               size_t cursor,
+              Lookback prev,
               bool wrap,
               std::set<size_t>& seen);
-  size_t find(llvm::StringRef key, bool at_start, size_t cursor, bool wrap);
-  
+  size_t find(llvm::StringRef key, size_t cursor, Lookback prev, bool wrap);
+
   // Find the key in the IR. Start searching from the current location of the
   // cursor and wrap around if necessary. The cursor will be positioned at
   // the end of first instance of key found in the IR. It is an error if the
@@ -50,8 +70,8 @@ protected:
   // one match as much as possible. If at_start is true, the key is expected
   // at the start of a line
   //
-  size_t find_and_move(const std::string& key, bool at_start, size_t& cursor);
-  size_t find_and_move(llvm::StringRef key, bool at_start, size_t& cursor);
+  size_t find_and_move(const std::string& key, Lookback prev, size_t& cursor);
+  size_t find_and_move(llvm::StringRef key, Lookback prev, size_t& cursor);
   size_t find_function(llvm::StringRef func,
                        llvm::StringRef prefix,
                        size_t& cursor,
@@ -71,8 +91,6 @@ public:
   // Associate the entities in the module with appropriate line numbers and
   // ranges in the text representation of the IR
   bool link(Module&);
-  llvm::SlotMapping& get_local_slots();
-  llvm::ModuleSlotTracker get_global_slots();
 };
 
 } // namespace lb

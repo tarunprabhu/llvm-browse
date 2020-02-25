@@ -16,14 +16,9 @@ Argument::Argument(const llvm::Argument& arg,
   ;
 }
 
-void
-Argument::init(llvm::ModuleSlotTracker& slots) {
-  set_tag(slots.getLocalSlot(&get_llvm()));
-}
-
 const Function&
 Argument::get_function() const {
-  return module.get<Function>(*get_llvm().getParent());
+  return module.get(*get_llvm().getParent());
 }
 
 const llvm::Argument&

@@ -19,9 +19,6 @@ protected:
 public:
   using Iterator = decltype(ops)::const_iterator;
 
-protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) override;
-
 public:
   Instruction(const llvm::Instruction& llvm_i, Module& module);
   virtual ~Instruction() = default;

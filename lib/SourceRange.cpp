@@ -1,31 +1,38 @@
 #include "SourceRange.h"
-#include "SourceFile.h"
+#include "Module.h"
 
 namespace lb {
 
-SourceRange::SourceRange(const SourceFile& file, uint64_t begin, uint64_t end) :
-    file(&file), begin(begin), end(end) {
+SourceRange::SourceRange() :
+    id(Module::get_invalid_id()), begin(llvm::StringRef::npos),
+    end(llvm::StringRef::npos) {
   ;
 }
 
-const SourceFile&
-SourceRange::get_file() const {
-  return *file;
+SourceRange::SourceRange(BufferId id, size_t begin, size_t end) :
+    id(id), begin(begin), end(end) {
+  ;
 }
 
-uint64_t
+bool
+SourceRange::is_valid() const {
+  return (id != Module::get_invalid_id()) and (begin != llvm::StringRef::npos)
+         and (end != llvm::StringRef::npos);
+}
+
+size_t
 SourceRange::get_begin() const {
   return begin;
 }
 
-uint64_t
+size_t
 SourceRange::get_end() const {
   return end;
 }
 
-std::string
-SourceRange::get_text() const {
-  return file->get_contents().substr(begin, end - begin);
+llvm::StringRef
+SourceRange::get_text(const Module& module) const {
+  return module.get_contents(id).substr(begin, end - begin);
 }
 
 } // namespace lb

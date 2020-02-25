@@ -10,9 +10,6 @@
 namespace lb {
 
 class GlobalVariable : public Value {
-protected:
-  virtual void init(llvm::ModuleSlotTracker& slots) override;
-  
 public:
   GlobalVariable(const llvm::GlobalVariable& llvm_g,
                  Module& module);
