@@ -2,6 +2,7 @@
 #define LLVM_BROWSE_CONSTANT_H
 
 #include <llvm/IR/Constant.h>
+#include <llvm/IR/ModuleSlotTracker.h>
 
 #include "Module.h"
 #include "Value.h"
@@ -9,8 +10,11 @@
 namespace lb {
 
 class Constant : public Value {
+protected:
+  virtual void init(llvm::ModuleSlotTracker& slots) override;
+  
 public:
-  Constant(const llvm::Constant&, Module&);
+  Constant(const llvm::Constant& llvm, Module& module);
   virtual ~Constant() = default;
 
   virtual const llvm::Constant& get_llvm() const override;

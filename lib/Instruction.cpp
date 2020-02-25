@@ -1,7 +1,7 @@
 #include "Instruction.h"
 #include "Constant.h"
 #include "Module.h"
-#include "Stringify.h"
+#include "String.h"
 
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/Casting.h>
@@ -13,13 +13,13 @@ using llvm::isa;
 
 namespace lb {
 
-Instruction::Instruction(const llvm::Instruction& inst, Module& module) :
-    Value(Value::Kind::Instruction, inst, module) {
-  ;
+Instruction::Instruction(const llvm::Instruction& llvm_i,
+                         Module& module) :
+    Value(Value::Kind::Instruction, llvm_i, module) {
 }
 
 void
-Instruction::init() {
+Instruction::init(llvm::ModuleSlotTracker& slots) {
   for(const llvm::Value* v : get_llvm().operand_values())
     if(isa<llvm::Argument>(v) or isa<llvm::Function>(v)
        or isa<llvm::GlobalVariable>(v) or isa<llvm::Instruction>(v)
@@ -33,7 +33,7 @@ Instruction::init() {
     else if(const auto* c = dyn_cast<llvm::Constant>(v))
       ops.push_back(&module.get_or_insert<Constant>(*c));
     else
-      llvm::errs() << str(*v) << "\n";
+      llvm::errs() << String::str(*v) << "\n";
 }
 
 const llvm::Instruction&

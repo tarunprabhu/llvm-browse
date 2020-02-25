@@ -3,16 +3,8 @@
 
 namespace lb {
 
-// SourceRange::SourceRange(const SourceFile& file) :
-//     file(file), begin(std::make_tuple(0, 0)), end(std::make_tuple(0, 0)) {
-//   ;
-// }
-
-SourceRange::SourceRange(const SourceFile& file,
-                         const std::tuple<unsigned, unsigned>& begin,
-                         const std::tuple<unsigned, unsigned>& end) :
-    file(&file),
-    begin(begin), end(end) {
+SourceRange::SourceRange(const SourceFile& file, uint64_t begin, uint64_t end) :
+    file(&file), begin(begin), end(end) {
   ;
 }
 
@@ -21,34 +13,19 @@ SourceRange::get_file() const {
   return *file;
 }
 
-unsigned
-SourceRange::get_begin_line() const {
-  return std::get<0>(begin);
-}
-
-unsigned
-SourceRange::get_begin_col() const {
-  return std::get<1>(begin);
-}
-
-unsigned
-SourceRange::get_end_line() const {
-  return std::get<0>(end);
-}
-
-unsigned
-SourceRange::get_end_col() const {
-  return std::get<1>(end);
-}
-
-const std::tuple<unsigned, unsigned>&
+uint64_t
 SourceRange::get_begin() const {
   return begin;
 }
 
-const std::tuple<unsigned, unsigned>&
+uint64_t
 SourceRange::get_end() const {
   return end;
+}
+
+std::string
+SourceRange::get_text() const {
+  return file->get_contents().substr(begin, end - begin);
 }
 
 } // namespace lb

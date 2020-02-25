@@ -14,6 +14,11 @@ Constant::Constant(const llvm::Constant& c, Module& module) :
   ;
 }
 
+void
+Constant::init(llvm::ModuleSlotTracker& slots) {
+  ;
+}
+
 const llvm::Constant&
 Constant::get_llvm() const {
   return cast<llvm::Constant>(llvm);

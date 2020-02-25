@@ -3,6 +3,7 @@
 
 #include <llvm/ADT/iterator_range.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/IR/ModuleSlotTracker.h>
 
 #include <vector>
 
@@ -19,10 +20,10 @@ public:
   using Iterator = decltype(ops)::const_iterator;
 
 protected:
-  virtual void init() override;
+  virtual void init(llvm::ModuleSlotTracker& slots) override;
 
 public:
-  Instruction(const llvm::Instruction&, Module&);
+  Instruction(const llvm::Instruction& llvm_i, Module& module);
   virtual ~Instruction() = default;
 
   Iterator begin() const;

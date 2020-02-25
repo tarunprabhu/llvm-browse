@@ -3,6 +3,7 @@
 
 #include <llvm/ADT/iterator_range.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/ModuleSlotTracker.h>
 
 #include <vector>
 
@@ -22,10 +23,11 @@ public:
   using Iterator = decltype(insts)::const_iterator;
 
 protected:
-  virtual void init() override;
+  virtual void init(llvm::ModuleSlotTracker& slots) override;
 
 public:
-  BasicBlock(const llvm::BasicBlock&, Module&);
+  BasicBlock(const llvm::BasicBlock& llvm_bb,
+             Module& module);
   virtual ~BasicBlock() = default;
 
   Iterator begin() const;

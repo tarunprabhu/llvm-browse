@@ -10,16 +10,22 @@ using llvm::isa;
 
 namespace lb {
 
-BasicBlock::BasicBlock(const llvm::BasicBlock& bb, Module& module) :
-    Value(Value::Kind::BasicBlock, bb, module) {
-  for(const llvm::Instruction& inst : bb)
+BasicBlock::BasicBlock(const llvm::BasicBlock& llvm_bb,
+                       Module& module) :
+    Value(Value::Kind::BasicBlock, llvm_bb, module) {
+  for(const llvm::Instruction& inst : llvm_bb)
     insts.push_back(&module.add<Instruction>(inst));
 }
 
 void
-BasicBlock::init() {
-  for(const llvm::Instruction& inst : get_llvm())
-    module.get<Instruction>(inst).init();
+BasicBlock::init(llvm::ModuleSlotTracker& slots) {
+  const llvm::BasicBlock& bb = get_llvm();
+  if(bb.hasName())
+    set_tag(bb.getName(), "%");
+  else 
+    set_tag(slots.getLocalSlot(&bb));
+  for(const llvm::Instruction& inst : bb)
+    module.get<Instruction>(inst).init(slots);
 }
 
 BasicBlock::Iterator

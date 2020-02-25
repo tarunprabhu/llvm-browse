@@ -1,7 +1,8 @@
 #ifndef LLVM_BROWSE_SOURCE_RANGE_H
 #define LLVM_BROWSE_SOURCE_RANGE_H
 
-#include <tuple>
+#include <stdint.h>
+#include <string>
 
 namespace lb {
 
@@ -10,24 +11,18 @@ class SourceFile;
 class SourceRange {
 protected:
   const SourceFile* file;
-  std::tuple<unsigned, unsigned> begin;
-  std::tuple<unsigned, unsigned> end;
+  uint64_t begin;
+  uint64_t end;
 
 public:
   SourceRange() = default;
-  SourceRange(const SourceFile&,
-              const std::tuple<unsigned, unsigned>&,
-              const std::tuple<unsigned, unsigned>&);
+  SourceRange(const SourceFile& file, uint64_t begin, uint64_t end);
   virtual ~SourceRange() = default;
 
   const SourceFile& get_file() const;
-  const std::tuple<unsigned, unsigned>& get_begin() const;
-  const std::tuple<unsigned, unsigned>& get_end() const;
-
-  unsigned get_begin_line() const;
-  unsigned get_begin_col() const;
-  unsigned get_end_line() const;
-  unsigned get_end_col() const;
+  uint64_t get_begin() const;
+  uint64_t get_end() const;
+  std::string get_text() const;
 };
 
 } // namespace lb

@@ -10,9 +10,15 @@ using llvm::isa;
 
 namespace lb {
 
-Argument::Argument(const llvm::Argument& arg, Module& module) :
+Argument::Argument(const llvm::Argument& arg,
+                   Module& module) :
     Value(Value::Kind::Argument, arg, module) {
   ;
+}
+
+void
+Argument::init(llvm::ModuleSlotTracker& slots) {
+  set_tag(slots.getLocalSlot(&get_llvm()));
 }
 
 const Function&
