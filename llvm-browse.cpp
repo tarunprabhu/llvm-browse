@@ -1,15 +1,20 @@
+#include <llvm/Support/InitLLVM.h>
+
 #include <iostream>
 #include <stdio.h>
 #include <unistd.h>
 
 #include "lib/Errors.h"
 #include "lib/Module.h"
+#include "ui/UI.h"
 
 int
 main(int argc, char* argv[]) {
-  bool maximize        = false;
-  std::string filename = "";
-  int opt              = -1;
+  llvm::InitLLVM(argc, argv);
+
+  bool maximize    = false;
+  std::string file = "";
+  int opt          = -1;
 
   while((opt = getopt(argc, argv, ":x")) != -1) {
     switch(opt) {
@@ -24,16 +29,18 @@ main(int argc, char* argv[]) {
   }
 
   for(; optind < argc; optind++) {
-    if(filename.length()) {
+    if(file.length()) {
       std::cerr << "At most one input file may be specified\n";
       return int(ErrorCode::ExtraCommandLineArg);
     }
-    filename = argv[optind];
+    file = argv[optind];
   }
 
+  llvm::LLVMContext context;
+
   // TODO: Start GUI here
-  if(filename.length()) {
-    const lb::Module module(filename);
+  if(file.length()) {
+    std::unique_ptr<lb::Module> module = lb::Module::create(file, context);
     if(not module)
       return ErrorCode::ModuleLoad;
   }
