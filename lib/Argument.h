@@ -5,26 +5,28 @@
 #include <llvm/IR/ModuleSlotTracker.h>
 
 #include "Function.h"
+#include "INavigable.h"
+#include "IWrapper.h"
 #include "Value.h"
 
 namespace lb {
 
-class Argument : public Value {
+class Module;
+
+class Argument :
+    public Value,
+    public INavigable,
+    public IWrapper<llvm::Argument> {
 public:
-  Argument(const llvm::Argument& llvm_arg,
-           Module& module);
+  Argument(llvm::Argument& llvm_arg, Module& module);
   virtual ~Argument() = default;
 
   const Function& get_function() const;
-  virtual const llvm::Argument& get_llvm() const override;
 
 public:
   static bool classof(const Value* v) {
     return v->get_kind() == Value::Kind::Argument;
   }
-
-public:
-  friend class Function;
 };
 
 } // namespace lb

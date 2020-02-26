@@ -12,13 +12,14 @@ using llvm::isa;
 
 namespace lb {
 
-Function::Function(const llvm::Function& llvm_f, Module& module) :
-    Value(Value::Kind::Function, llvm_f, module) {
+Function::Function(llvm::Function& llvm_f, Module& module) :
+    Value(Value::Kind::Function),
+    INavigable(), IWrapper<llvm::Function>(llvm_f, module) {
   set_tag(llvm_f.getName(), "@");
-  for(const llvm::Argument& arg : llvm_f.args())
-    args.push_back(&module.add<Argument>(arg));
-  for(const llvm::BasicBlock& bb : llvm_f)
-    bbs.push_back(&module.add<BasicBlock>(bb));
+  for(llvm::Argument& arg : llvm_f.args())
+    args.push_back(&get_module().add(arg));
+  for(llvm::BasicBlock& bb : llvm_f)
+    bbs.push_back(&get_module().add(bb));
 }
 
 Function::Iterator
@@ -49,11 +50,6 @@ Function::arg_end() const {
 llvm::iterator_range<Function::ArgIterator>
 Function::arguments() const {
   return llvm::iterator_range<Function::ArgIterator>(args);
-}
-
-const llvm::Function&
-Function::get_llvm() const {
-  return cast<llvm::Function>(llvm);
 }
 
 } // namespace lb

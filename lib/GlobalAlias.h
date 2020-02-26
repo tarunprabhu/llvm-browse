@@ -3,16 +3,19 @@
 
 #include <llvm/IR/GlobalAlias.h>
 
+#include "INavigable.h"
+#include "IWrapper.h"
 #include "Value.h"
 
 namespace lb {
 
-class GlobalAlias : public Value {
+class GlobalAlias :
+    public Value,
+    public INavigable,
+    public IWrapper<llvm::GlobalAlias> {
 public:
-  GlobalAlias(const llvm::GlobalAlias& llvm_a, Module& module);
+  GlobalAlias(llvm::GlobalAlias& llvm_a, Module& module);
   virtual ~GlobalAlias() = default;
-
-  virtual const llvm::GlobalAlias& get_llvm() const override;
 
 public:
   static bool classof(const Value* v) {

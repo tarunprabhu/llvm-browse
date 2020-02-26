@@ -2,6 +2,7 @@
 #define LLVM_BROWSE_NAVIGABLE_H
 
 #include <string>
+#include <vector>
 
 #include <llvm/ADT/StringRef.h>
 
@@ -23,7 +24,7 @@ namespace lb {
 // corresponding location in the source. Examples of these would be
 // vtables and typeinfo objects
 //
-class Navigable {
+class INavigable {
 protected:
   std::string tag;
 
@@ -54,23 +55,41 @@ protected:
   // beyond that 
   SourceRange source;
 
-protected:
-  Navigable() = default;
-
+  // This is sort of messy because not everything that is navigable ought to
+  // have a use. The exeception are struct types that also have a definition
+  // but it doesn't make sense to have any uses for them. But it's a bit messy
+  // to separate the two and still keep the type system straight (or - and this
+  // is more likely - I am being particuarly dense)
+  std::vector<SourceRange> m_uses;
 
 public:
-  virtual ~Navigable() = default;
+  using Iterator = decltype(m_uses)::const_iterator;
 
-  void set_tag(int slot);
+protected:
+  INavigable() = default;
+
+public:
+  virtual ~INavigable() = default;
+
+  // This gets used for both instructions and metadata nodes and for metadata
+  // nodes, we have a different prefix
+  void set_tag(unsigned slot, llvm::StringRef prefix = "%");
   void set_tag(llvm::StringRef name);
   void set_tag(llvm::StringRef name,
                llvm::StringRef prefix,
                bool may_need_quotes = true);
+  
+  void sort_uses();
+  void add_use(const SourceRange& range);
 
   void set_defn_range(const SourceRange& range);
   void set_llvm_range(const SourceRange& range);
   void set_source_range(const SourceRange& range);
 
+  Iterator begin() const;
+  Iterator end() const;
+  llvm::iterator_range<Iterator> uses() const;
+  unsigned get_num_uses() const;
   bool has_tag() const;
   llvm::StringRef get_tag() const;
   const SourceRange& get_defn_range() const;

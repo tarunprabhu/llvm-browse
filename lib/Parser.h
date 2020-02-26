@@ -5,12 +5,14 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Support/MemoryBuffer.h>
 
+#include <map>
 #include <memory>
 #include <set>
 
 namespace lb {
 
 class Module;
+class INavigable;
 class Value;
 
 // Currently, this is not actually a parser, but it really ought to be
@@ -50,14 +52,17 @@ protected:
   llvm::StringRef ir;
 
 protected:
+  std::vector<const llvm::MDNode*> get_metadata(const llvm::GlobalObject&);
+  std::vector<const llvm::MDNode*> get_metadata(const llvm::Instruction&);
+  
   // Helper function used when assocating values with uses.
   // Checks if the position has already been associated with another value
   // in the map
-  bool overlaps(size_t pos, const std::map<Value*, size_t>& mapped);
+  bool overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped);
 
   // Associate the values with uses starting at the cursor
-  std::map<Value*, size_t> associate_values(std::vector<Value*> values,
-                                            size_t cursor);
+  std::map<INavigable*, size_t>
+  associate_values(std::vector<INavigable*> values, size_t cursor);
 
   size_t find(llvm::StringRef key,
               size_t cursor,
@@ -79,9 +84,9 @@ protected:
   // desired
   void collect_constants(const llvm::Constant* c,
                          Module& module,
-                         std::vector<Value*>& consts);
-  std::vector<Value*> collect_constants(const llvm::Constant* c,
-                                        Module& module);
+                         std::vector<INavigable*>& consts);
+  std::vector<INavigable*> collect_constants(const llvm::Constant* c,
+                                             Module& module);
 
   // Find the key in the IR. Start searching from the current location of the
   // cursor and wrap around if necessary. The cursor will be positioned at

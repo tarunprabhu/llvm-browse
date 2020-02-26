@@ -5,23 +5,38 @@
 #include "GlobalAlias.h"
 #include "GlobalVariable.h"
 #include "Instruction.h"
+#include "INavigable.h"
+#include "Module.h"
+#include "MDNode.h"
 #include "Value.h"
 
 #include <glib.h>
 
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
 
 using llvm::cast;
 using llvm::dyn_cast;
+using llvm::dyn_cast_or_null;
 using llvm::isa;
 
 namespace lb {
 
-Parser::Parser() : local_slots(nullptr), global_slots(new llvm::SlotMapping()) {
+template<typename T>
+static void
+sort_by_tag_name(std::vector<T*>& objs) {
+  std::sort(objs.begin(), objs.end(), [](const T* l, const T* r) {
+    return l->get_tag().size() < r->get_tag().size();
+  });
+  std::reverse(objs.begin(), objs.end());
+}
+  
+Parser::Parser() : local_slots(nullptr), global_slots(nullptr) {
   ;
 }
 
@@ -30,6 +45,7 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
                  llvm::LLVMContext& context) {
   g_message("Parsing IR");
 
+  global_slots.reset(new llvm::SlotMapping());
   std::unique_ptr<llvm::Module> module;
   std::unique_ptr<llvm::MemoryBuffer> out;
   llvm::SMDiagnostic error;
@@ -38,11 +54,11 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
                                   context,
                                   global_slots.get())) {
     out = std::move(in);
-    ir = out->getBuffer();
+    ir  = out->getBuffer();
   } else {
     g_error("Error parsing IR: %s", error.getMessage().data());
   }
-  
+
   return std::make_tuple(std::move(module), std::move(out));
 }
 
@@ -51,18 +67,23 @@ Parser::parse_bc(std::unique_ptr<llvm::MemoryBuffer> in,
                  llvm::LLVMContext& context) {
   g_message("Parsing bitcode");
 
+  // When parsing a bitcode, we convert it back to IR and parse the IR instead.
+  // It's the only way to get the slot numbers for metadata nodes
+  // so we can link them up as well. At some point, we may make the linked
+  // metadata step optional, in which case we won't have to do this silly
+  // double parsing
+  //
+  llvm::LLVMContext tmp;
   std::unique_ptr<llvm::Module> module;
   std::unique_ptr<llvm::MemoryBuffer> out;
   if(llvm::Expected<std::unique_ptr<llvm::Module>> expected
-     = llvm::parseBitcodeFile(in->getMemBufferRef(), context)) {
-    module = std::move(expected.get());
+     = llvm::parseBitcodeFile(in->getMemBufferRef(), tmp)) {
     g_message("Converting bitcode to IR");
     std::string s;
     llvm::raw_string_ostream ss(s);
-    ss << *module;
-    out = llvm::MemoryBuffer::getMemBufferCopy(ss.str(),
-                                               in->getBufferIdentifier());
-    ir = out->getBuffer();
+    ss << *expected.get();
+    return parse_ir(llvm::MemoryBuffer::getMemBufferCopy(llvm::StringRef(s)),
+                    context);
   } else {
     g_error("Error parsing bitcode");
   }
@@ -179,7 +200,7 @@ Parser::find_function(llvm::StringRef func,
 void
 Parser::collect_constants(const llvm::Constant* c,
                           Module& module,
-                          std::vector<Value*>& consts) {
+                          std::vector<INavigable*>& consts) {
   if(const auto* cexpr = dyn_cast<llvm::ConstantExpr>(c)) {
     for(const llvm::Value* op : cexpr->operand_values())
       collect_constants(cast<llvm::Constant>(op), module, consts);
@@ -191,41 +212,47 @@ Parser::collect_constants(const llvm::Constant* c,
     if(not(ty->isIntegerTy() or ty->isFloatingPointTy() or ty->isHalfTy()))
       for(const llvm::Value* op : carray->operand_values())
         collect_constants(cast<llvm::Constant>(op), module, consts);
-  } else if(const auto* gv = dyn_cast<llvm::GlobalValue>(c)) {
-    if(not module.contains(*gv))
-      g_critical("Missing global value: %s", gv->getName().data());
-    consts.push_back(&module.get(*gv));
+  } else if(const auto* g = dyn_cast<llvm::GlobalVariable>(c)) {
+    consts.push_back(static_cast<INavigable*>(&module.get(*g)));
+  } else if(const auto* a = dyn_cast<llvm::GlobalAlias>(c)) {
+    consts.push_back(static_cast<INavigable*>(&module.get(*a)));
+  } else if(const auto* f = dyn_cast<llvm::Function>(c)) {
+    consts.push_back(static_cast<INavigable*>(&module.get(*f)));
+  } else if(isa<llvm::ConstantData>(c) or isa<llvm::BlockAddress>(c)) {
+    ;
+  } else {
+    std::string buf;
+    llvm::raw_string_ostream ss(buf);
+    ss << *c;
+    ss.flush();
+    g_critical("Unknown constant type: %s", buf.c_str());
   }
 }
 
-std::vector<Value*>
+std::vector<INavigable*>
 Parser::collect_constants(const llvm::Constant* c, Module& module) {
-  std::vector<Value*> consts;
+  std::vector<INavigable*> consts;
   collect_constants(c, module, consts);
   return consts;
 }
 
 bool
-Parser::overlaps(size_t pos, const std::map<Value*, size_t>& mapped) {
+Parser::overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped) {
   for(const auto& it : mapped) {
-    const Value* v = it.first;
-    size_t begin   = it.second;
-    size_t end     = begin + v->get_tag().size();
+    const INavigable* v = it.first;
+    size_t begin       = it.second;
+    size_t end         = begin + v->get_tag().size();
     if(pos >= begin and pos <= end)
       return true;
   }
   return false;
 }
 
-std::map<Value*, size_t>
-Parser::associate_values(std::vector<Value*> values, size_t cursor) {
-  std::sort(values.begin(), values.end(), [](const Value* l, const Value* r) {
-    return l->get_tag().size() < r->get_tag().size();
-  });
-  std::reverse(values.begin(), values.end());
-
-  std::map<Value*, size_t> mapped;
-  for(Value* v : values) {
+std::map<INavigable*, size_t>
+Parser::associate_values(std::vector<INavigable*> values, size_t cursor) {
+  sort_by_tag_name(values);
+  std::map<INavigable*, size_t> mapped;
+  for(INavigable* v : values) {
     llvm::StringRef tag = v->get_tag();
     size_t pos          = find(tag, cursor, Lookback::Whitespace, false);
     while(overlaps(pos, mapped))
@@ -237,9 +264,51 @@ Parser::associate_values(std::vector<Value*> values, size_t cursor) {
   return mapped;
 }
 
+static bool
+is_debug_metadata(const llvm::MDNode* md) {
+  return isa<llvm::DINode>(md) or isa<llvm::DILocation>(md)
+         or isa<llvm::DIExpression>(md)
+         or isa<llvm::DIGlobalVariableExpression>(md);
+}
+
+std::vector<const llvm::MDNode*>
+Parser::get_metadata(const llvm::GlobalObject& g) {
+  std::vector<const llvm::MDNode*> ret;
+  llvm::SmallVector<std::pair<unsigned, llvm::MDNode*>, 8> mds;
+  g.getAllMetadata(mds);
+  for(const auto& i : mds) {
+    const llvm::MDNode* md = i.second;
+    if(not is_debug_metadata(md))
+      ret.push_back(md);
+  }
+  return ret;
+}
+
+std::vector<const llvm::MDNode*>
+Parser::get_metadata(const llvm::Instruction& inst) {
+  std::vector<const llvm::MDNode*> ret;
+  llvm::SmallVector<std::pair<unsigned, llvm::MDNode*>, 8> mds;
+  inst.getAllMetadataOtherThanDebugLoc(mds);
+  for(const auto& i : mds) {
+    const llvm::MDNode* md = i.second;
+    if(not is_debug_metadata(md))
+      ret.push_back(md);
+  }
+  return ret;
+}
+
 bool
 Parser::link(Module& module) {
+  // Not really sure if this is actually helping.
+  // But the idea is that I don't have to allocate a string every time
+  // I need to create a key to search for an instruction definition.
+  // Same for the vector for metadata nodes
+  std::string buf;
+  llvm::raw_string_ostream ss(buf);
+  std::vector<INavigable*> ops;
+  std::set<const llvm::MDNode*> wl;
   size_t cursor = 0;
+
   local_slots.reset(new llvm::ModuleSlotTracker(&module.get_llvm()));
 
   llvm::Module& llvm = module.get_llvm();
@@ -250,7 +319,7 @@ Parser::link(Module& module) {
     // but right now, I'm not sure how to get a handle to them in the IR
     if(llvm_sty->hasName()) {
       StructType& sty = module.add(llvm_sty);
-      size_t pos = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
+      size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
       sty.set_defn_range(SourceRange(pos, pos + sty.get_tag().size()));
     } else {
       std::string buf;
@@ -268,7 +337,15 @@ Parser::link(Module& module) {
     if(llvm_g.hasName()) {
       GlobalVariable& g = module.add(llvm_g);
       size_t pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
-      g.set_defn_range(SourceRange(pos, pos + g.get_tag().size()));
+      if(pos == llvm::StringRef::npos)
+        g_error("Could not find global definition: %s", g.get_tag().data());
+      else
+        g.set_defn_range(SourceRange(pos, pos + g.get_tag().size()));
+
+      // FIXME: Skipping any metadata on global variables because I can't
+      // figure out how to get just the non-debug 
+      // for(const llvm::MDNode* md : get_metadata(llvm_g))
+      //   wl.insert(md);
     } else {
       std::string buf;
       llvm::raw_string_ostream ss(buf);
@@ -276,41 +353,55 @@ Parser::link(Module& module) {
       g_warning("Skipping unnamed global: %s", buf.c_str());
     }
   }
-  
-  // Do this in two passes because there may be circular references
-  g_message("Reading functions");
-  for(llvm::Function& function : llvm.functions()) {
-    Function& f            = module.add(function);
-    llvm::StringRef prefix = function.size() ? "define" : "declare";
-    size_t pos = find_function(llvm::StringRef(f.get_tag()), prefix, cursor);
-    f.set_defn_range(SourceRange(pos, pos + f.get_tag().size()));
-  }
-  
+
   g_message("Reading global aliases");
-  for(llvm::GlobalAlias& llvm_a: llvm.aliases()) {
+  for(llvm::GlobalAlias& llvm_a : llvm.aliases()) {
     GlobalAlias& a = module.add(llvm_a);
     size_t pos     = find_and_move(a.get_tag(), Lookback::Newline, cursor);
-    a.set_defn_range(SourceRange(pos, pos + a.get_tag().size()));
+    if(pos == llvm::StringRef::npos)
+      g_error("Could not find alias definition: %s", a.get_tag().data());
+    else
+      a.set_defn_range(SourceRange(pos, pos + a.get_tag().size()));
   }
-  
-  g_message("Initializing global variables");
+
+  // Do this in two passes because there may be circular references
+  g_message("Reading functions");
+  for(llvm::Function& llvm_f : llvm.functions()) {
+    Function& f            = module.add(llvm_f);
+    llvm::StringRef prefix = llvm_f.size() ? "define" : "declare";
+    size_t pos             = find_function(f.get_tag(), prefix, cursor);
+    if(pos == llvm::StringRef::npos)
+      g_error("Could not find function definition: %s", f.get_tag().data());
+    else
+      f.set_defn_range(SourceRange(pos, pos + f.get_tag().size()));
+    for(const llvm::MDNode* md : get_metadata(llvm_f))
+      wl.insert(md);
+  }
+
+  g_message("Reading metadata");
+  for(const auto& i : global_slots->MetadataNodes) {
+    MDNode& md = module.add(*i.second, i.first);
+    buf.clear();
+    ss << md.get_tag() << " =";
+    size_t pos = find_and_move(ss.str(), Lookback::Newline, cursor);
+    if(pos == llvm::StringRef::npos)
+      g_error("Could not find metadata definition: %s", md.get_tag().data());
+    else
+      md.set_defn_range(SourceRange(pos, pos + md.get_tag().size()));
+  }
+
+  g_message("Processing global variables");
   for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
     // The global might not be in the module if it doesn't have a name
     if(module.contains(llvm_g)) {
       GlobalVariable& g = module.get(llvm_g);
       if(llvm_g.hasInitializer())
         associate_values(collect_constants(llvm_g.getInitializer(), module),
-                         g.get_defn_range().get_end());        
+                         g.get_defn_range().get_end());
     }
   }
 
-  // Not really sure if this is actually helping.
-  // But the idea is that I don't have to allocate a string every time
-  // I need to create a key to search for an instruction definition
-  std::string buf;
-  llvm::raw_string_ostream ss(buf);
-
-  g_message("Initializing functions");
+  g_message("Processing functions");
   for(llvm::Function& llvm_f : llvm.functions()) {
     // For functions that are declared, we don't even try to do anything
     if(not llvm_f.size())
@@ -319,7 +410,7 @@ Parser::link(Module& module) {
     Function& f = module.get(llvm_f);
     // Reposition the cursor at the function definition because we know that
     // things will  be closer
-    cursor         = f.get_defn_range().get_end();
+    cursor = f.get_defn_range().get_end();
     local_slots->incorporateFunction(llvm_f);
     size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
     for(llvm::Argument& llvm_arg : llvm_f.args()) {
@@ -372,7 +463,7 @@ Parser::link(Module& module) {
     for(llvm::BasicBlock& llvm_bb : llvm_f) {
       BasicBlock& bb = module.get(llvm_bb);
       for(const llvm::Instruction& llvm_inst : llvm_bb) {
-        Instruction& inst = module.get(llvm_inst);
+        Instruction& inst   = module.get(llvm_inst);
         llvm::StringRef tag = inst.get_tag();
         buf.clear();
         ss << tag;
@@ -393,7 +484,7 @@ Parser::link(Module& module) {
         // substring of a longer one matches against a previous match, it can
         // be ignored. This does not care if the instruction is split over
         // multiple lines.
-        std::vector<Value*> values;
+        ops.clear();
         for(const llvm::Value* op : llvm_inst.operand_values())
           // If the module does not contain the operand, then it is either a
           // llvm::Metadata (more specifically, llvm::MetadataAsValue) or
@@ -402,23 +493,39 @@ Parser::link(Module& module) {
           // references to llvm::Function or llvm::GlobalVariable that we
           // do care about. As with other instances, we just collect them
           // all now and process them later
-          if(module.contains(*op))
-            values.push_back(&module.get(*op));
+          if(const auto* i = dyn_cast<llvm::Instruction>(op))
+            ops.push_back(&module.get(*i));
+          else if(const auto* a = dyn_cast<llvm::Argument>(op))
+            ops.push_back(&module.get(*a));
+          else if(const auto* f = dyn_cast<llvm::Function>(op))
+            ops.push_back(&module.get(*f));
+          else if(const auto* g = dyn_cast<llvm::GlobalVariable>(op))
+            ops.push_back(&module.get(*g));
+          else if(const auto* a = dyn_cast<llvm::GlobalAlias>(op))
+            ops.push_back(&module.get(*a));
+          else if(const auto* bb = dyn_cast<llvm::BasicBlock>(op))
+            ops.push_back(&module.get(*bb));
           else if(const auto* c = dyn_cast<llvm::Constant>(op))
-            collect_constants(c, module, values);
-
-        std::map<Value*, size_t> mapped
-            = associate_values(std::move(values), i_begin);
-
-        for(const llvm::Value* op : llvm_inst.operand_values()) {
-          if(module.contains(*op)) {
-            Value* v = &module.get(*op);
-            size_t begin = mapped.at(v);
-            inst.add_operand(SourceRange(begin, begin + v->get_tag().size()));
-          } else {
-            inst.add_operand(SourceRange());
+            collect_constants(c, module, ops);
+          else if(isa<llvm::MetadataAsValue>(op))
+            ;
+          else {
+            std::string buf;
+            llvm::raw_string_ostream ss(buf);
+            ss << *op;
+            ss.flush();
+            g_critical("Unexpected instruction operand: %s", buf.c_str());
           }
+        for(const llvm::MDNode* llvm_md : get_metadata(llvm_inst)) {
+          ops.push_back(&module.get(*llvm_md));
+          // This will be used to collect all the MDNode's seen in function
+          // metadata after which it will get used to get all MDNodes reachable
+          // from it
+          wl.insert(llvm_md);
         }
+
+        std::map<INavigable*, size_t> mapped
+            = associate_values(std::move(ops), i_begin);
       }
 
       // There isn't a reasonable way to find the start of a basic block
@@ -459,6 +566,56 @@ Parser::link(Module& module) {
     size_t f_end = module.get(llvm_f.back()).get_defn_range().get_end();
     if(f_end != llvm::StringRef::npos)
       f.set_llvm_range(SourceRange(f_begin, f_end + 1));
+  }
+
+  g_message("Processing metadata");
+  // Add MDNodes reachable from NamedMDNodes
+  for(const llvm::NamedMDNode& nmd : llvm.named_metadata())
+    for(const llvm::MDNode* md : nmd.operands())
+      if(not is_debug_metadata(md))
+        wl.insert(md);
+
+  // Expand the number of MDNodes that get used until we reach a fixed point
+  // The DI* nodes should not be navigable, but everything else should
+  std::set<const llvm::MDNode*> seen;
+  for(const llvm::MDNode* md : wl)
+    seen.insert(md);
+  std::set<const llvm::MDNode*> wl2;
+  do {
+    for(const llvm::MDNode* md : wl)
+      for(const llvm::MDOperand& mop : md->operands())
+        if(const auto* op = dyn_cast_or_null<llvm::MDNode>(mop))
+          if(not is_debug_metadata(op))
+            if(seen.insert(op).second)
+              wl2.insert(op);
+    wl = std::move(wl2);
+  } while(wl.size());
+
+  std::vector<MDNode*> mds;
+  for(const llvm::MDNode* md : seen)
+    if(module.contains(*md))
+      mds.push_back(&module.get(*md));
+  sort_by_tag_name(mds);
+  for(MDNode* md : mds) {
+    const llvm::MDNode& llvm_md = md->get_llvm();
+    cursor                      = md->get_defn_range().get_end();
+    for(unsigned i = 0; i < llvm_md.getNumOperands(); i++) {
+      if(const auto* mop
+         = dyn_cast_or_null<llvm::MDNode>(llvm_md.getOperand(i))) {
+        MDNode& op = module.get(*mop);
+        buf.clear();
+        ss << op.get_tag();
+        if(i < llvm_md.getNumOperands() - 1)
+          ss << ",";
+        else
+          ss << "}";
+        size_t pos = find_and_move(ss.str(), Lookback::Any, cursor);
+        if(pos != llvm::StringRef::npos)
+          op.add_use(SourceRange(pos, pos + op.get_tag().size()));
+        else
+          g_warning("Could not find metadata operand: %s", op.get_tag().data());
+      }
+    }
   }
 
   return true;

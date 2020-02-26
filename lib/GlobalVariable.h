@@ -1,29 +1,29 @@
 #ifndef LLVM_BROWSE_GLOBAL_VARIABLE_H
 #define LLVM_BROWSE_GLOBAL_VARIABLE_H
 
-#include <llvm/IR/ModuleSlotTracker.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/ModuleSlotTracker.h>
 
-#include "Module.h"
+#include "INavigable.h"
+#include "IWrapper.h"
 #include "Value.h"
 
 namespace lb {
 
-class GlobalVariable : public Value {
-public:
-  GlobalVariable(const llvm::GlobalVariable& llvm_g,
-                 Module& module);
-  virtual ~GlobalVariable() = default;
+class Module;
 
-  virtual const llvm::GlobalVariable& get_llvm() const override;
+class GlobalVariable :
+    public Value,
+    public INavigable,
+    IWrapper<llvm::GlobalVariable> {
+public:
+  GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module);
+  virtual ~GlobalVariable() = default;
 
 public:
   static bool classof(const Value* v) {
     return v->get_kind() == Value::Kind::GlobalVariable;
   }
-
-public:
-  friend class Module;
 };
 
 } // namespace lb

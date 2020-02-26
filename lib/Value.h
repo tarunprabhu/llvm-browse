@@ -7,13 +7,13 @@
 
 #include <vector>
 
-#include "Navigable.h"
+#include "IWrapper.h"
 
 namespace lb {
 
 class Module;
 
-class Value : public Navigable {
+class Value {
 public:
   enum class Kind {
     Argument = 1,
@@ -26,30 +26,15 @@ public:
   };
 
 protected:
-  Module& module;
-  const llvm::Value& llvm;
   Kind kind;
-  std::vector<SourceRange> m_uses;
 
-public:
-  using Iterator = decltype(m_uses)::const_iterator;
-  
 protected:
-  Value(Kind kind, const llvm::Value& llvm, Module& module);
+  Value(Kind kind);
 
 public:
   virtual ~Value() = default;
 
-  void sort_uses();
-  void add_use(const SourceRange& range);
-
-  Iterator begin() const;
-  Iterator end() const;
-  llvm::iterator_range<Iterator> uses() const;
-  unsigned get_num_uses() const;
   Kind get_kind() const;
-  const Module& get_module() const;
-  virtual const llvm::Value& get_llvm() const = 0;
 };
 
 } // namespace lb

@@ -7,13 +7,20 @@
 
 #include <vector>
 
-#include "BasicBlock.h"
+#include "INavigable.h"
+#include "IWrapper.h"
 #include "SourceRange.h"
 #include "Value.h"
 
 namespace lb {
 
-class Instruction : public Value {
+class BasicBlock;
+class Function;
+
+class Instruction :
+    public Value,
+    public INavigable,
+    public IWrapper<llvm::Instruction> {
 protected:
   std::vector<SourceRange> ops;
 
@@ -21,7 +28,7 @@ public:
   using Iterator = decltype(ops)::const_iterator;
 
 public:
-  Instruction(const llvm::Instruction& llvm_i, Module& module);
+  Instruction(llvm::Instruction& llvm_i, Module& module);
   virtual ~Instruction() = default;
 
   void add_operand(const SourceRange& = SourceRange());
@@ -32,15 +39,11 @@ public:
   llvm::iterator_range<Iterator> operands() const;
   const BasicBlock& get_block() const;
   const Function& get_function() const;
-  virtual const llvm::Instruction& get_llvm() const override;
 
 public:
   static bool classof(const Value* v) {
     return v->get_kind() == Value::Kind::Instruction;
   }
-
-public:
-  friend class BasicBlock;
 };
 
 } // namespace lb

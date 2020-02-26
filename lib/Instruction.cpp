@@ -1,5 +1,6 @@
 #include "Instruction.h"
-#include "Constant.h"
+#include "BasicBlock.h"
+#include "Function.h"
 #include "Module.h"
 #include "String.h"
 
@@ -13,8 +14,9 @@ using llvm::isa;
 
 namespace lb {
 
-Instruction::Instruction(const llvm::Instruction& llvm_i, Module& module) :
-    Value(Value::Kind::Instruction, llvm_i, module) {
+Instruction::Instruction(llvm::Instruction& llvm_i, Module& module) :
+    Value(Value::Kind::Instruction),
+    INavigable(), IWrapper<llvm::Instruction>(llvm_i, module) {
   ;
 }
 
@@ -45,17 +47,12 @@ Instruction::operands() const {
 
 const BasicBlock&
 Instruction::get_block() const {
-  return module.get(*get_llvm().getParent());
+  return get_module().get(*get_llvm().getParent());
 }
 
 const Function&
 Instruction::get_function() const {
   return get_block().get_function();
-}
-  
-const llvm::Instruction&
-Instruction::get_llvm() const {
-  return llvm::cast<llvm::Instruction>(llvm);
 }
 
 } // namespace lb

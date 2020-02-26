@@ -7,26 +7,30 @@
 
 #include <vector>
 
-#include "Module.h"
+#include "INavigable.h"
+#include "IWrapper.h"
 #include "Value.h"
 
 namespace lb {
 
 class Argument;
 class BasicBlock;
+class Module;
 
-class Function : public Value {
+class Function :
+    public Value,
+    public INavigable,
+    public IWrapper<llvm::Function> {
 protected:
   std::vector<const Argument*> args;
   std::vector<const BasicBlock*> bbs;
 
 public:
   using ArgIterator = decltype(args)::const_iterator;
-  using Iterator = decltype(bbs)::const_iterator;
+  using Iterator    = decltype(bbs)::const_iterator;
 
 public:
-  Function(const llvm::Function& llvm_f,
-           Module& module);
+  Function(llvm::Function& llvm_f, Module& module);
   virtual ~Function() = default;
 
   Iterator begin() const;
@@ -36,15 +40,10 @@ public:
   ArgIterator arg_end() const;
   llvm::iterator_range<ArgIterator> arguments() const;
 
-  virtual const llvm::Function& get_llvm() const override;
-
 public:
   static bool classof(const Value* v) {
     return v->get_kind() == Value::Kind::Function;
   }
-
-public:
-  friend class Module;
 };
 
 } // namespace lb

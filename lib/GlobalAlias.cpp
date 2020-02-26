@@ -9,14 +9,10 @@ using llvm::isa;
 
 namespace lb {
 
-GlobalAlias::GlobalAlias(const llvm::GlobalAlias& llvm_a, Module& module) :
-    Value(Value::Kind::GlobalAlias, llvm_a, module) {
+GlobalAlias::GlobalAlias(llvm::GlobalAlias& llvm_a, Module& module) :
+    Value(Value::Kind::GlobalAlias),
+    INavigable(), IWrapper<llvm::GlobalAlias>(llvm_a, module) {
   set_tag(llvm_a.getName(), "@");
-}
-
-const llvm::GlobalAlias&
-GlobalAlias::get_llvm() const {
-  return cast<llvm::GlobalAlias>(llvm);
 }
 
 } // namespace lb

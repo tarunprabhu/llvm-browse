@@ -1,4 +1,5 @@
 #include "BasicBlock.h"
+#include "Function.h"
 #include "Instruction.h"
 #include "Module.h"
 
@@ -10,11 +11,11 @@ using llvm::isa;
 
 namespace lb {
 
-BasicBlock::BasicBlock(const llvm::BasicBlock& llvm_bb,
-                       Module& module) :
-    Value(Value::Kind::BasicBlock, llvm_bb, module) {
-  for(const llvm::Instruction& inst : llvm_bb)
-    insts.push_back(&module.add<Instruction>(inst));
+BasicBlock::BasicBlock(llvm::BasicBlock& llvm_bb, Module& module) :
+    Value(Value::Kind::BasicBlock),
+    INavigable(), IWrapper<llvm::BasicBlock>(llvm_bb, module) {
+  for(llvm::Instruction& inst : llvm_bb)
+    insts.push_back(&get_module().add(inst));
 }
 
 BasicBlock::Iterator
@@ -34,12 +35,12 @@ BasicBlock::instructions() const {
 
 const Function&
 BasicBlock::get_function() const {
-  return module.get(*get_llvm().getParent());
+  return get_module().get(*get_llvm().getParent());
 }
 
-const llvm::BasicBlock&
-BasicBlock::get_llvm() const {
-  return cast<llvm::BasicBlock>(llvm);
-}
+// const llvm::BasicBlock&
+// BasicBlock::get_llvm() const {
+//   return cast<llvm::BasicBlock>(llvm);
+// }
 
 } // namespace lb

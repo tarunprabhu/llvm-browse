@@ -5,6 +5,7 @@
 #include "GlobalAlias.h"
 #include "GlobalVariable.h"
 #include "Instruction.h"
+#include "MDNode.h"
 #include "Parser.h"
 #include "StructType.h"
 
@@ -34,8 +35,58 @@ Module::contains(const llvm::Value& llvm) const {
 }
 
 bool
+Module::contains(const llvm::MDNode& llvm) const {
+  return mmap.find(&llvm) != mmap.end();
+}
+  
+bool
 Module::contains_main() const {
   return buffers.find(Module::get_main_id()) != buffers.end();
+}
+
+Argument&
+Module::add(llvm::Argument& llvm) {
+  return add<Argument>(llvm);
+}
+
+BasicBlock&
+Module::add(llvm::BasicBlock& llvm) {
+  return add<BasicBlock>(llvm);
+}
+
+Function&
+Module::add(llvm::Function& llvm) {
+  Function& f = add<Function>(llvm);
+  m_functions.push_back(&f);
+  return f;
+}
+
+GlobalAlias&
+Module::add(llvm::GlobalAlias& llvm) {
+  GlobalAlias& a = add<GlobalAlias>(llvm);
+  m_aliases.push_back(&a);
+  return a;
+}
+
+GlobalVariable&
+Module::add(llvm::GlobalVariable& llvm) {
+  GlobalVariable& g = add<GlobalVariable>(llvm);
+  m_globals.push_back(&g);
+  return g;
+}
+
+Instruction&
+Module::add(llvm::Instruction& llvm) {
+  return add<Instruction>(llvm);
+}
+
+MDNode&
+Module::add(llvm::MDNode& llvm, unsigned slot) {
+  auto* ptr = new MDNode(llvm, slot, *this);
+  mds.emplace_back(ptr);
+  m_metadata.push_back(ptr);
+  mmap[&llvm] = ptr;
+  return *ptr;
 }
 
 StructType&
@@ -45,27 +96,6 @@ Module::add(llvm::StructType* llvm) {
   m_structs.push_back(ptr);
   tmap[llvm] = ptr;
   return *ptr;
-}
-
-Function&
-Module::add(const llvm::Function& llvm) {
-  Function& f = add<Function>(llvm);
-  m_functions.push_back(&f);
-  return f;
-}
-
-GlobalAlias&
-Module::add(const llvm::GlobalAlias& llvm) {
-  GlobalAlias& a = add<GlobalAlias>(llvm);
-  m_aliases.push_back(&a);
-  return a;
-}
-  
-GlobalVariable&
-Module::add(const llvm::GlobalVariable& llvm) {
-  GlobalVariable& g = add<GlobalVariable>(llvm);
-  m_globals.push_back(&g);
-  return g;
 }
 
 BufferId
@@ -136,6 +166,11 @@ Module::get(const llvm::GlobalVariable& llvm) {
   return get<GlobalVariable>(llvm);
 }
 
+MDNode&
+Module::get(const llvm::MDNode& llvm) {
+  return *mmap.at(&llvm);
+}
+
 Value&
 Module::get(const llvm::Value& llvm) {
   return get<Value>(llvm);
@@ -176,6 +211,11 @@ Module::get(const llvm::GlobalVariable& llvm) const {
   return get<GlobalVariable>(llvm);
 }
 
+const MDNode&
+Module::get(const llvm::MDNode& llvm) const {
+  return *mmap.at(&llvm);
+}
+
 const Value&
 Module::get(const llvm::Value& llvm) const {
   return get<Value>(llvm);
@@ -193,22 +233,27 @@ Module::get_contents(BufferId id) const {
 
 llvm::iterator_range<Module::AliasIterator>
 Module::aliases() const {
-  return llvm::iterator_range<Module::AliasIterator>(m_aliases);
+  return llvm::iterator_range<AliasIterator>(m_aliases);
 }
 
 llvm::iterator_range<Module::FunctionIterator>
 Module::functions() const {
-  return llvm::iterator_range<Module::FunctionIterator>(m_functions);
+  return llvm::iterator_range<FunctionIterator>(m_functions);
 }
 
 llvm::iterator_range<Module::GlobalIterator>
 Module::globals() const {
-  return llvm::iterator_range<Module::GlobalIterator>(m_globals);
+  return llvm::iterator_range<GlobalIterator>(m_globals);
 }
 
-llvm::iterator_range<Module::StructTypeIterator>
+llvm::iterator_range<Module::MetadataIterator>
+Module::metadata() const {
+  return llvm::iterator_range<MetadataIterator>(m_metadata);
+}
+
+llvm::iterator_range<Module::StructIterator>
 Module::structs() const {
-  return llvm::iterator_range<Module::StructTypeIterator>(m_structs);
+  return llvm::iterator_range<StructIterator>(m_structs);
 }
 
 llvm::Module&
@@ -232,17 +277,20 @@ Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
 }
 
 bool
-Module::check_navigable(const Navigable& n) const {
+Module::check_navigable(const INavigable& n) const {
   llvm::StringRef tag = n.get_tag();
   if(const SourceRange& range = n.get_defn_range()) {
     if(not check_range(range, tag)) {
       size_t begin = range.get_begin();
       size_t end   = range.get_end();
-      g_critical("Definition mismatch");
-      g_critical("  Range:    %ld, %ld", begin, end);
-      g_critical("  Expected: %s", tag.data());
-      g_critical("  Got:      %s",
-                 get_contents().substr(begin, end - begin).data());
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      ss << "Definition mismatch\n"
+         << "  Range:    " << begin << ", " << end << "\n"
+         << "  Expected: " << tag << "\n"
+         << "  Got:      " << get_contents().substr(begin, end - begin);
+      ss.flush();
+      g_critical("\n%s", buf.c_str());
       return false;
     }
   } else {
@@ -253,29 +301,29 @@ Module::check_navigable(const Navigable& n) const {
 }
 
 bool
-Module::check_value(const Value& v) const {
-  for(const SourceRange& use : v.uses()) {
-    if(not check_range(use, v.get_tag())) {
-      std::string buf;
-      llvm::raw_string_ostream ss(buf);
-      ss << v.get_llvm();
+Module::check_uses(const INavigable& n) const {
+  for(const SourceRange& use : n.uses()) {
+    if(not check_range(use, n.get_tag())) {
       size_t begin = use.get_begin();
       size_t end   = use.get_end();
-      g_critical("Use mismatch");
-      g_critical("  Range:    %ld, %ld", begin, end);
-      g_critical("  Expected: %s", buf.c_str());
-      g_critical("  Got:      %s",
-                 get_contents().substr(begin, end - begin).data());
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      ss << "Use mismatch\n"
+         << "  Range:    " << begin << ", " << end << "\n"
+         << "  Expected: " << n.get_tag() << "\n"
+         << "  Got:      " << get_contents().substr(begin, end - begin);
+      ss.flush();
+      g_critical("\n%s", buf.c_str());
       return false;
     }
   }
-  if(v.get_llvm().getNumUses() != v.get_num_uses()) {
-    g_critical("Mismatch in number of uses: %s (%u, %u)\n",
-               v.get_tag().data(),
-               v.get_llvm().getNumUses(),
-               v.get_num_uses());
-    return false;
-  }
+
+  // TODO:
+  // Ideally, we should also try to check that the number of uses matches
+  // with LLVM. But that might result in many mismatches because there may
+  // be uses in the debug metadata that will be skipped because the
+  // debug metadata is not currently browsable
+
   return true;
 }
 
@@ -293,37 +341,49 @@ Module::check_top_level() const {
       return false;
   for(const Function* f : functions())
     if(not check_navigable(*f))
-      return true;
+      return false;
   return true;
 }
 
 bool
-Module::check_all(bool metadata) const {
+Module::check_all(bool check_metadata) const {
   if(not check_top_level())
     return false;
   g_message("Checking uses of aliases");
   for(const GlobalAlias* a : aliases())
-    if(not check_value(*a))
+    if(not check_uses(*a))
       return false;
   g_message("Checking uses of globals");
   for(const GlobalVariable* g : globals())
-    if(not check_value(*g))
+    if(not check_uses(*g))
       return false;
   g_message("Checking uses of functions");
   for(const Function* f : functions()) {
-    if(not check_value(*f))
+    if(not check_uses(*f))
       return false;
     for(const Argument* arg : f->arguments())
-      if(not check_value(*arg))
+      if(not check_uses(*arg))
         return false;
     for(const BasicBlock* bb : f->blocks()) {
-      for(const Instruction* inst : bb->instructions())
-        if(not check_value(*inst))
+      // We can't check the names of a basic block because the definition
+      // has no place where it is consistently declared. We probably need
+      // a better test case for this
+      if(not check_uses(*bb))
+        return false;
+      for(const Instruction* inst : bb->instructions()) {
+        if((not inst->get_llvm().getType()->isVoidTy())
+           and (not check_navigable(*inst)))
           return false;
+        if(not check_uses(*inst))
+          return false;
+      }
     }
   }
-  if(metadata) {
-    g_warning("Checking metadata not implemented");
+  if(check_metadata) {
+    g_message("Checking metadata");
+    for(const MDNode* md : metadata())
+      if(not check_navigable(*md) or not check_uses(*md)) 
+        return false;
   }
   return true;
 }
