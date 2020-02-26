@@ -36,6 +36,21 @@ Function::blocks() const {
   return llvm::iterator_range<Function::Iterator>(bbs);
 }
 
+Function::ArgIterator
+Function::arg_begin() const {
+  return args.cbegin();
+}
+
+Function::ArgIterator
+Function::arg_end() const {
+  return args.cend();
+}
+
+llvm::iterator_range<Function::ArgIterator>
+Function::arguments() const {
+  return llvm::iterator_range<Function::ArgIterator>(args);
+}
+
 const llvm::Function&
 Function::get_llvm() const {
   return cast<llvm::Function>(llvm);

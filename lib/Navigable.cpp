@@ -1,6 +1,8 @@
 #include "Navigable.h"
 #include "String.h"
 
+#include <glib.h>
+
 namespace lb {
 
 static bool
@@ -20,7 +22,7 @@ void
 Navigable::set_tag(llvm::StringRef name) {
   tag = name;
 }
-  
+
 void
 Navigable::set_tag(llvm::StringRef name,
                    llvm::StringRef prefix,
@@ -35,7 +37,7 @@ void
 Navigable::set_defn_range(const SourceRange& range) {
   defn = range;
 }
-  
+
 void
 Navigable::set_llvm_range(const SourceRange& range) {
   llvm = range;
@@ -44,6 +46,11 @@ Navigable::set_llvm_range(const SourceRange& range) {
 void
 Navigable::set_source_range(const SourceRange& range) {
   source = range;
+}
+
+bool
+Navigable::has_tag() const {
+  return tag.length();
 }
 
 llvm::StringRef
@@ -55,7 +62,7 @@ const SourceRange&
 Navigable::get_defn_range() const {
   return defn;
 }
-  
+
 const SourceRange&
 Navigable::get_llvm_range() const {
   return llvm;

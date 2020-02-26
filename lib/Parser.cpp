@@ -2,8 +2,10 @@
 #include "Argument.h"
 #include "BasicBlock.h"
 #include "Function.h"
+#include "GlobalAlias.h"
 #include "GlobalVariable.h"
 #include "Instruction.h"
+#include "Value.h"
 
 #include <glib.h>
 
@@ -13,6 +15,7 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
 
+using llvm::cast;
 using llvm::dyn_cast;
 using llvm::isa;
 
@@ -150,16 +153,15 @@ Parser::find_function(llvm::StringRef func,
         = find("\n", line_start + prefix.size(), Lookback::Any, false);
     if(line_end == llvm::StringRef::npos)
       line_end = find("\0", line_start + prefix.size(), Lookback::Any, false);
-    llvm::StringRef substr = ir.substr(line_start, line_end);
+    llvm::StringRef substr = ir.substr(line_start, line_end - line_start);
     size_t found           = substr.find(func);
-    if(found) {
+    if(found != llvm::StringRef::npos) {
       found  = line_start + found;
       cursor = found + func.size();
       return found;
     } else if(seen.insert(found).second) {
       return find_function(func, prefix, cursor, seen);
     } else {
-      llvm::errs() << "Could not find function in IR: " << func << "\n";
       g_error("Could not find function in IR: %s", func.data());
     }
   }
@@ -174,52 +176,131 @@ Parser::find_function(llvm::StringRef func,
   return find_function(func, prefix, cursor, seen);
 }
 
+void
+Parser::collect_constants(const llvm::Constant* c,
+                          Module& module,
+                          std::vector<Value*>& consts) {
+  if(const auto* cexpr = dyn_cast<llvm::ConstantExpr>(c)) {
+    for(const llvm::Value* op : cexpr->operand_values())
+      collect_constants(cast<llvm::Constant>(op), module, consts);
+  } else if(const auto* cstruct = dyn_cast<llvm::ConstantStruct>(c)) {
+    for(const llvm::Value* op : cstruct->operand_values())
+      collect_constants(cast<llvm::Constant>(op), module, consts);
+  } else if(const auto* carray = dyn_cast<llvm::ConstantArray>(c)) {
+    llvm::Type* ty = carray->getType()->getElementType();
+    if(not(ty->isIntegerTy() or ty->isFloatingPointTy() or ty->isHalfTy()))
+      for(const llvm::Value* op : carray->operand_values())
+        collect_constants(cast<llvm::Constant>(op), module, consts);
+  } else if(const auto* gv = dyn_cast<llvm::GlobalValue>(c)) {
+    if(not module.contains(*gv))
+      g_critical("Missing global value: %s", gv->getName().data());
+    consts.push_back(&module.get(*gv));
+  }
+}
+
+std::vector<Value*>
+Parser::collect_constants(const llvm::Constant* c, Module& module) {
+  std::vector<Value*> consts;
+  collect_constants(c, module, consts);
+  return consts;
+}
+
 bool
-Parser::link(lb::Module& module) {
+Parser::overlaps(size_t pos, const std::map<Value*, size_t>& mapped) {
+  for(const auto& it : mapped) {
+    const Value* v = it.first;
+    size_t begin   = it.second;
+    size_t end     = begin + v->get_tag().size();
+    if(pos >= begin and pos <= end)
+      return true;
+  }
+  return false;
+}
+
+std::map<Value*, size_t>
+Parser::associate_values(std::vector<Value*> values, size_t cursor) {
+  std::sort(values.begin(), values.end(), [](const Value* l, const Value* r) {
+    return l->get_tag().size() < r->get_tag().size();
+  });
+  std::reverse(values.begin(), values.end());
+
+  std::map<Value*, size_t> mapped;
+  for(Value* v : values) {
+    llvm::StringRef tag = v->get_tag();
+    size_t pos          = find(tag, cursor, Lookback::Whitespace, false);
+    while(overlaps(pos, mapped))
+      pos = find(tag, pos + 1, Lookback::Whitespace, false);
+    mapped[v] = pos;
+    v->add_use(SourceRange(pos, pos + v->get_tag().size()));
+  }
+
+  return mapped;
+}
+
+bool
+Parser::link(Module& module) {
   size_t cursor = 0;
-  BufferId id = Module::get_main_id();
   local_slots.reset(new llvm::ModuleSlotTracker(&module.get_llvm()));
 
   llvm::Module& llvm = module.get_llvm();
 
   g_message("Reading types");
-  for(llvm::StructType* sty : llvm.getIdentifiedStructTypes()) {
+  for(llvm::StructType* llvm_sty : llvm.getIdentifiedStructTypes()) {
     // TODO: At some point, we'll deal with unnamed struct types
     // but right now, I'm not sure how to get a handle to them in the IR
-    if(sty->hasName()) {
-      StructType& strct = module.add(sty);
-      size_t pos = find_and_move(strct.get_tag(), Lookback::Newline, cursor);
-      strct.set_defn_range(SourceRange(id, pos, pos + strct.get_tag().size()));
+    if(llvm_sty->hasName()) {
+      StructType& sty = module.add(llvm_sty);
+      size_t pos = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
+      sty.set_defn_range(SourceRange(pos, pos + sty.get_tag().size()));
+    } else {
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      ss << llvm_sty;
+      g_warning("Skipping unnamed struct type: %s", buf.c_str());
     }
   }
 
   g_message("Reading global variables");
-  for(llvm::GlobalVariable& global : llvm.globals()) {
+  for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
     // TODO: At some point, we'll deal with unnamed globals. Right now,
     // we stick to named globals because we can definitely get a handle to
     // them in the LLVM IR
-    if(global.hasName()) {
-      GlobalVariable& g = module.add(global);
+    if(llvm_g.hasName()) {
+      GlobalVariable& g = module.add(llvm_g);
       size_t pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
-      g.set_defn_range(SourceRange(id, pos, pos + g.get_tag().size()));
+      g.set_defn_range(SourceRange(pos, pos + g.get_tag().size()));
+    } else {
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      ss << llvm_g;
+      g_warning("Skipping unnamed global: %s", buf.c_str());
     }
   }
-
+  
   // Do this in two passes because there may be circular references
   g_message("Reading functions");
   for(llvm::Function& function : llvm.functions()) {
     Function& f            = module.add(function);
     llvm::StringRef prefix = function.size() ? "define" : "declare";
     size_t pos = find_function(llvm::StringRef(f.get_tag()), prefix, cursor);
-    f.set_defn_range(SourceRange(id, pos, pos + f.get_tag().size()));
+    f.set_defn_range(SourceRange(pos, pos + f.get_tag().size()));
   }
-
+  
+  g_message("Reading global aliases");
+  for(llvm::GlobalAlias& llvm_a: llvm.aliases()) {
+    GlobalAlias& a = module.add(llvm_a);
+    size_t pos     = find_and_move(a.get_tag(), Lookback::Newline, cursor);
+    a.set_defn_range(SourceRange(pos, pos + a.get_tag().size()));
+  }
+  
   g_message("Initializing global variables");
-  for(llvm::GlobalVariable& global : llvm.globals()) {
-    if(global.hasName()) {
-      // FIXME: If the global has an initializer, we need to parse it to
-      // find the uses of other constants within it. An example use case is
-      // the vtables which will definitely use the methods of a class.
+  for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
+    // The global might not be in the module if it doesn't have a name
+    if(module.contains(llvm_g)) {
+      GlobalVariable& g = module.get(llvm_g);
+      if(llvm_g.hasInitializer())
+        associate_values(collect_constants(llvm_g.getInitializer(), module),
+                         g.get_defn_range().get_end());        
     }
   }
 
@@ -228,7 +309,7 @@ Parser::link(lb::Module& module) {
   // I need to create a key to search for an instruction definition
   std::string buf;
   llvm::raw_string_ostream ss(buf);
-  
+
   g_message("Initializing functions");
   for(llvm::Function& llvm_f : llvm.functions()) {
     // For functions that are declared, we don't even try to do anything
@@ -239,10 +320,8 @@ Parser::link(lb::Module& module) {
     // Reposition the cursor at the function definition because we know that
     // things will  be closer
     cursor         = f.get_defn_range().get_end();
-    size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
-
-    llvm::errs() << llvm_f.getName() << "\n";
     local_slots->incorporateFunction(llvm_f);
+    size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
     for(llvm::Argument& llvm_arg : llvm_f.args()) {
       Argument& arg = module.get(llvm_arg);
       if(llvm_arg.hasName())
@@ -261,23 +340,16 @@ Parser::link(lb::Module& module) {
       // ends up being a pain in the ass for some people.
     }
 
-    // Iterate over all the basic blocks first and set their tag because
-    // we will have "forward references" to them in branch instructions
-    // and if we don't assign them a tag first, we can't link them up
-    // correctly
+    // Iterate over all the basic blocks and instructions and set their tag
+    // first because we can have "forward references" to them in branch and phi
+    // instructions respectively. If we don't assign them a tag first,
+    // we can't link them up correctly
     for(llvm::BasicBlock& llvm_bb : llvm_f) {
       BasicBlock& bb = module.get(llvm_bb);
       if(llvm_bb.hasName())
         bb.set_tag(llvm_bb.getName(), "%");
       else
         bb.set_tag(local_slots->getLocalSlot(&llvm_bb));
-    }
-
-    // Now iterate over all the basic blocks and the instructions
-    // We don't have to worry about forward iterations on instructions because
-    // it is incorrect to have an instruction use preceding a definition
-    for(llvm::BasicBlock& llvm_bb : llvm_f) {
-      BasicBlock& bb = module.get(llvm_bb);
       for(const llvm::Instruction& llvm_inst : llvm_bb) {
         Instruction& inst = module.get(llvm_inst);
         if(llvm_inst.hasName())
@@ -291,22 +363,61 @@ Parser::link(lb::Module& module) {
             inst.set_tag("call");
         else
           inst.set_tag(llvm_inst.getOpcodeName());
+      }
+    }
 
+    // Now iterate over all the basic blocks and the instructions
+    // We don't have to worry about forward iterations on instructions because
+    // it is incorrect to have an instruction use preceding a definition
+    for(llvm::BasicBlock& llvm_bb : llvm_f) {
+      BasicBlock& bb = module.get(llvm_bb);
+      for(const llvm::Instruction& llvm_inst : llvm_bb) {
+        Instruction& inst = module.get(llvm_inst);
+        llvm::StringRef tag = inst.get_tag();
         buf.clear();
-        ss << inst.get_tag();
+        ss << tag;
         if(not llvm_inst.getType()->isVoidTy())
           ss << " =";
 
-        size_t pos = find_and_move(ss.str(), Lookback::Whitespace, cursor);
-        inst.set_defn_range(SourceRange(id, pos, pos + inst.get_tag().size()));
+        size_t i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
+        if(llvm_inst.getType()->isVoidTy())
+          inst.set_defn_range(SourceRange(i_begin, i_begin));
+        else
+          inst.set_defn_range(SourceRange(i_begin, i_begin + tag.size()));
 
-        llvm::errs() << "  " << inst.get_tag() << "\n";
-        for(const llvm::Value* op : llvm_inst.operand_values()) {
+        // Because we don't want to even try to parse the instruction operands,
+        // everything will have to be text-based matching. To reduce the
+        // possibility of false matches, the operands that have to linked
+        // are first sorted by length and matched from the longest to the
+        // shortest. This way, if a shorter operand which happens to be a
+        // substring of a longer one matches against a previous match, it can
+        // be ignored. This does not care if the instruction is split over
+        // multiple lines.
+        std::vector<Value*> values;
+        for(const llvm::Value* op : llvm_inst.operand_values())
+          // If the module does not contain the operand, then it is either a
+          // llvm::Metadata (more specifically, llvm::MetadataAsValue) or
+          // an llvm::Constant. Most constants we don't care about, but
+          // we do care about llvm::ConstantExpr because they could contain
+          // references to llvm::Function or llvm::GlobalVariable that we
+          // do care about. As with other instances, we just collect them
+          // all now and process them later
           if(module.contains(*op))
-            llvm::errs() << "    " << module.get(*op).get_tag() << " => '"
-                         << op->hasName() << "'\n";
-          else
-            llvm::errs() << "    <null>\n";
+            values.push_back(&module.get(*op));
+          else if(const auto* c = dyn_cast<llvm::Constant>(op))
+            collect_constants(c, module, values);
+
+        std::map<Value*, size_t> mapped
+            = associate_values(std::move(values), i_begin);
+
+        for(const llvm::Value* op : llvm_inst.operand_values()) {
+          if(module.contains(*op)) {
+            Value* v = &module.get(*op);
+            size_t begin = mapped.at(v);
+            inst.add_operand(SourceRange(begin, begin + v->get_tag().size()));
+          } else {
+            inst.add_operand(SourceRange());
+          }
         }
       }
 
@@ -314,8 +425,12 @@ Parser::link(lb::Module& module) {
       // other than by finding the location of the first instruction in it
       // It might not be safe to rely on the labels being printed as comments
       // Already, the label for the entry block has been removed from the IR
+      // We don't really have a reasonable place to go to when we go to the
+      // definition of a basic block other than to the start of the first
+      // instruction
       size_t bb_begin
           = module.get(llvm_bb.front()).get_defn_range().get_begin();
+      bb.set_defn_range(SourceRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular
@@ -338,12 +453,12 @@ Parser::link(lb::Module& module) {
       }
 
       if(bb_end != llvm::StringRef::npos)
-        bb.set_defn_range(SourceRange(id, bb_begin, bb_end));
+        bb.set_llvm_range(SourceRange(bb_begin, bb_end));
     }
 
     size_t f_end = module.get(llvm_f.back()).get_defn_range().get_end();
     if(f_end != llvm::StringRef::npos)
-      f.set_defn_range(SourceRange(id, f_begin, f_end + 1));
+      f.set_llvm_range(SourceRange(f_begin, f_end + 1));
   }
 
   return true;

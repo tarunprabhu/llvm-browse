@@ -8,13 +8,14 @@
 #include <vector>
 
 #include "BasicBlock.h"
+#include "SourceRange.h"
 #include "Value.h"
 
 namespace lb {
 
 class Instruction : public Value {
 protected:
-  std::vector<const Value*> ops;
+  std::vector<SourceRange> ops;
 
 public:
   using Iterator = decltype(ops)::const_iterator;
@@ -23,6 +24,9 @@ public:
   Instruction(const llvm::Instruction& llvm_i, Module& module);
   virtual ~Instruction() = default;
 
+  void add_operand(const SourceRange& = SourceRange());
+
+  SourceRange get_operand(unsigned i) const;
   Iterator begin() const;
   Iterator end() const;
   llvm::iterator_range<Iterator> operands() const;

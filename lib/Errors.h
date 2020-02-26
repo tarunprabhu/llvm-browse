@@ -7,6 +7,8 @@ struct ErrorCode {
     CommandLineArg,
     ExtraCommandLineArg,
     ModuleLoad,
+    Internal,
+    Sanity,
   } value;
 
   ErrorCode(decltype(value) val) : value(val) {

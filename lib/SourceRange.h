@@ -19,13 +19,20 @@ protected:
 
 public:
   SourceRange();
+  SourceRange(size_t begin, size_t end);
   SourceRange(BufferId id, size_t begin, size_t end);
   virtual ~SourceRange() = default;
 
   bool is_valid() const;
+  BufferId get_id() const;
   size_t get_begin() const;
   size_t get_end() const;
   llvm::StringRef get_text(const Module& module) const;
+
+public:
+  operator bool() const {
+    return is_valid();
+  }
 };
 
 } // namespace lb

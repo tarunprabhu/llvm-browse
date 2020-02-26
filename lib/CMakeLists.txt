@@ -3,12 +3,12 @@ set(SOURCES
   BasicBlock.cpp
   Constant.cpp
   Function.cpp
+  GlobalAlias.cpp
   GlobalVariable.cpp
   Instruction.cpp
   Module.cpp
   Navigable.cpp
   Parser.cpp
-  SourceFile.cpp
   SourceRange.cpp
   String.cpp
   StructType.cpp

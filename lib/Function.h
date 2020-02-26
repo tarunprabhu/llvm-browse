@@ -21,6 +21,7 @@ protected:
   std::vector<const BasicBlock*> bbs;
 
 public:
+  using ArgIterator = decltype(args)::const_iterator;
   using Iterator = decltype(bbs)::const_iterator;
 
 public:
@@ -31,6 +32,9 @@ public:
   Iterator begin() const;
   Iterator end() const;
   llvm::iterator_range<Iterator> blocks() const;
+  ArgIterator arg_begin() const;
+  ArgIterator arg_end() const;
+  llvm::iterator_range<ArgIterator> arguments() const;
 
   virtual const llvm::Function& get_llvm() const override;
 

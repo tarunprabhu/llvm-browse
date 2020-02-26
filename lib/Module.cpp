@@ -2,6 +2,7 @@
 #include "Argument.h"
 #include "BasicBlock.h"
 #include "Function.h"
+#include "GlobalAlias.h"
 #include "GlobalVariable.h"
 #include "Instruction.h"
 #include "Parser.h"
@@ -41,6 +42,7 @@ StructType&
 Module::add(llvm::StructType* llvm) {
   auto* ptr = new StructType(llvm, *this);
   struct_types.emplace_back(ptr);
+  m_structs.push_back(ptr);
   tmap[llvm] = ptr;
   return *ptr;
 }
@@ -48,14 +50,21 @@ Module::add(llvm::StructType* llvm) {
 Function&
 Module::add(const llvm::Function& llvm) {
   Function& f = add<Function>(llvm);
-  fptrs.push_back(&f);
+  m_functions.push_back(&f);
   return f;
 }
 
+GlobalAlias&
+Module::add(const llvm::GlobalAlias& llvm) {
+  GlobalAlias& a = add<GlobalAlias>(llvm);
+  m_aliases.push_back(&a);
+  return a;
+}
+  
 GlobalVariable&
 Module::add(const llvm::GlobalVariable& llvm) {
   GlobalVariable& g = add<GlobalVariable>(llvm);
-  gptrs.push_back(&g);
+  m_globals.push_back(&g);
   return g;
 }
 
@@ -117,6 +126,11 @@ Module::get(const llvm::Function& llvm) {
   return get<Function>(llvm);
 }
 
+GlobalAlias&
+Module::get(const llvm::GlobalAlias& llvm) {
+  return get<GlobalAlias>(llvm);
+}
+
 GlobalVariable&
 Module::get(const llvm::GlobalVariable& llvm) {
   return get<GlobalVariable>(llvm);
@@ -152,6 +166,11 @@ Module::get(const llvm::Function& llvm) const {
   return get<Function>(llvm);
 }
 
+const GlobalAlias&
+Module::get(const llvm::GlobalAlias& llvm) const {
+  return get<GlobalAlias>(llvm);
+}
+
 const GlobalVariable&
 Module::get(const llvm::GlobalVariable& llvm) const {
   return get<GlobalVariable>(llvm);
@@ -172,19 +191,24 @@ Module::get_contents(BufferId id) const {
   return buffers.at(id)->getBuffer();
 }
 
+llvm::iterator_range<Module::AliasIterator>
+Module::aliases() const {
+  return llvm::iterator_range<Module::AliasIterator>(m_aliases);
+}
+
 llvm::iterator_range<Module::FunctionIterator>
 Module::functions() const {
-  return llvm::iterator_range<Module::FunctionIterator>(fptrs);
+  return llvm::iterator_range<Module::FunctionIterator>(m_functions);
 }
 
 llvm::iterator_range<Module::GlobalIterator>
 Module::globals() const {
-  return llvm::iterator_range<Module::GlobalIterator>(gptrs);
+  return llvm::iterator_range<Module::GlobalIterator>(m_globals);
 }
 
 llvm::iterator_range<Module::StructTypeIterator>
 Module::structs() const {
-  return llvm::iterator_range<Module::StructTypeIterator>(sptrs);
+  return llvm::iterator_range<Module::StructTypeIterator>(m_structs);
 }
 
 llvm::Module&
@@ -195,6 +219,113 @@ Module::get_llvm() {
 const llvm::Module&
 Module::get_llvm() const {
   return *llvm;
+}
+
+bool
+Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
+  size_t begin          = range.get_begin();
+  size_t end            = range.get_end();
+  llvm::StringRef slice = get_contents().substr(begin, end - begin);
+  if(slice != tag)
+    return false;
+  return true;
+}
+
+bool
+Module::check_navigable(const Navigable& n) const {
+  llvm::StringRef tag = n.get_tag();
+  if(const SourceRange& range = n.get_defn_range()) {
+    if(not check_range(range, tag)) {
+      size_t begin = range.get_begin();
+      size_t end   = range.get_end();
+      g_critical("Definition mismatch");
+      g_critical("  Range:    %ld, %ld", begin, end);
+      g_critical("  Expected: %s", tag.data());
+      g_critical("  Got:      %s",
+                 get_contents().substr(begin, end - begin).data());
+      return false;
+    }
+  } else {
+    g_critical("Invalid definition: %s", tag.data());
+    return false;
+  }
+  return true;
+}
+
+bool
+Module::check_value(const Value& v) const {
+  for(const SourceRange& use : v.uses()) {
+    if(not check_range(use, v.get_tag())) {
+      std::string buf;
+      llvm::raw_string_ostream ss(buf);
+      ss << v.get_llvm();
+      size_t begin = use.get_begin();
+      size_t end   = use.get_end();
+      g_critical("Use mismatch");
+      g_critical("  Range:    %ld, %ld", begin, end);
+      g_critical("  Expected: %s", buf.c_str());
+      g_critical("  Got:      %s",
+                 get_contents().substr(begin, end - begin).data());
+      return false;
+    }
+  }
+  if(v.get_llvm().getNumUses() != v.get_num_uses()) {
+    g_critical("Mismatch in number of uses: %s (%u, %u)\n",
+               v.get_tag().data(),
+               v.get_llvm().getNumUses(),
+               v.get_num_uses());
+    return false;
+  }
+  return true;
+}
+
+bool
+Module::check_top_level() const {
+  g_message("Checking top-level entities");
+  for(const StructType* sty : structs())
+    if(not check_navigable(*sty))
+      return false;
+  for(const GlobalAlias* a : aliases())
+    if(not check_navigable(*a))
+      return false;
+  for(const GlobalVariable* g : globals())
+    if(not check_navigable(*g))
+      return false;
+  for(const Function* f : functions())
+    if(not check_navigable(*f))
+      return true;
+  return true;
+}
+
+bool
+Module::check_all(bool metadata) const {
+  if(not check_top_level())
+    return false;
+  g_message("Checking uses of aliases");
+  for(const GlobalAlias* a : aliases())
+    if(not check_value(*a))
+      return false;
+  g_message("Checking uses of globals");
+  for(const GlobalVariable* g : globals())
+    if(not check_value(*g))
+      return false;
+  g_message("Checking uses of functions");
+  for(const Function* f : functions()) {
+    if(not check_value(*f))
+      return false;
+    for(const Argument* arg : f->arguments())
+      if(not check_value(*arg))
+        return false;
+    for(const BasicBlock* bb : f->blocks()) {
+      for(const Instruction* inst : bb->instructions())
+        if(not check_value(*inst))
+          return false;
+    }
+  }
+  if(metadata) {
+    g_warning("Checking metadata not implemented");
+  }
+  return true;
 }
 
 std::unique_ptr<Module>

@@ -70,6 +70,7 @@ endif()
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC -std=c++14)
 add_definitions(${LLVM_DEFINITIONS})
 include_directories(BEFORE ${LLVM_INCLUDE_DIRS} ${GTKMM_INCLUDE_DIRS})
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Top-level binaries and executables to be built
 set(EXECUTABLE llvm-browse)
@@ -78,11 +79,4 @@ set(LIB_LLVM_BROWSE_UI libLLVMBrowseUI)
 
 add_subdirectory(lib)
 add_subdirectory(ui)
-
-# FIXME: This should probaby be moved to a /src directory but I'm not sure if
-# anything else will go in there in that case
-set(SOURCES llvm-browse.cpp)
-add_executable(${EXECUTABLE}
-  ${SOURCES})
-target_link_libraries(${EXECUTABLE}
-  ${LIB_LLVM_BROWSE_LIB} ${LIB_LLVM_BROWSE_UI})
+add_subdirectory(src)

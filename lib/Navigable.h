@@ -26,8 +26,32 @@ namespace lb {
 class Navigable {
 protected:
   std::string tag;
+
+  // The defn range is the range of characters in the IR that correspond to
+  // the "definition" of an entity. The "definition" is where the cursor must
+  // go when the user asks to go to the definition of an entity.
+  // For basic blocks, it corresponds to the start of the first instruction
+  // in the block and may be of length 0. For instructions that return a value,
+  // this will be the "%<slot> = % part of the instruction while for those 
+  // that don't return a value, it may cover the instruction opcode although
+  // it might be better if it is of length 0 and positioned just at the start
+  // of the op code
   SourceRange defn;
+
+  // The LLVM range is the range in characters that the entity covers in
+  // the IR. For functions, this is the entire body, for basic blocks, all
+  // the characters from the start of the first instruction in the block to
+  // the end of the last. It may be invalid for other entities
   SourceRange llvm;
+
+  // The source range is the range in characters in the source code that the
+  // entity covers. This is a somewhat more nebulous range because there may not
+  // be a reasonable mapping from the source to LLVM. For instance, multiple
+  // instructions could map to the same lines in the source code in which case
+  // the source range of all those instructions are likely to be identical
+  // Still, this is mainly here so we have a decent starting point at which
+  // to position the cursor in the source even if we can't do anything else
+  // beyond that 
   SourceRange source;
 
 protected:
@@ -46,7 +70,8 @@ public:
   void set_defn_range(const SourceRange& range);
   void set_llvm_range(const SourceRange& range);
   void set_source_range(const SourceRange& range);
-  
+
+  bool has_tag() const;
   llvm::StringRef get_tag() const;
   const SourceRange& get_defn_range() const;
   const SourceRange& get_llvm_range() const;

@@ -11,6 +11,7 @@
 namespace lb {
 
 class Module;
+class Value;
 
 // Currently, this is not actually a parser, but it really ought to be
 // because that would be far more efficient than the current kludgy way of
@@ -49,12 +50,38 @@ protected:
   llvm::StringRef ir;
 
 protected:
+  // Helper function used when assocating values with uses.
+  // Checks if the position has already been associated with another value
+  // in the map
+  bool overlaps(size_t pos, const std::map<Value*, size_t>& mapped);
+
+  // Associate the values with uses starting at the cursor
+  std::map<Value*, size_t> associate_values(std::vector<Value*> values,
+                                            size_t cursor);
+
   size_t find(llvm::StringRef key,
               size_t cursor,
               Lookback prev,
               bool wrap,
               std::set<size_t>& seen);
   size_t find(llvm::StringRef key, size_t cursor, Lookback prev, bool wrap);
+
+  // This is meant to find the operands of a constant (typically a
+  // ConstantArray, ConstantStruct or ConstantExpr) that we want to be able
+  // to navigate to. Typically, we are only concerned with the top-level
+  // entities like functions or globals, but we expand it to include the
+  // global indirect objects as well in case we ever support it.
+  // This will be called when we encounter a ConstantExpr in an instruction
+  // or in the initializer of a global variable. We return a vector instead of
+  // a set because there may be multiple occurences of the same global value
+  // in the operands of the constant and we want to be able to find them all
+  // later so we can hook them up, so duplicates in this case are very much
+  // desired
+  void collect_constants(const llvm::Constant* c,
+                         Module& module,
+                         std::vector<Value*>& consts);
+  std::vector<Value*> collect_constants(const llvm::Constant* c,
+                                        Module& module);
 
   // Find the key in the IR. Start searching from the current location of the
   // cursor and wrap around if necessary. The cursor will be positioned at
