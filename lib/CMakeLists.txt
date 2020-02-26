@@ -1,12 +1,10 @@
 set(SOURCES
   Argument.cpp
   BasicBlock.cpp
-  # Constant.cpp
   Function.cpp
   GlobalAlias.cpp
   GlobalVariable.cpp
   Instruction.cpp
-  # IWrapper.cpp
   MDNode.cpp
   Module.cpp
   INavigable.cpp
