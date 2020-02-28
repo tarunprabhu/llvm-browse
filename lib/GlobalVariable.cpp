@@ -1,7 +1,7 @@
 #include "GlobalVariable.h"
 #include "Module.h"
 
-#include <glib.h>
+#include <glibmm.h>
 
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>

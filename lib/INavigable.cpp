@@ -1,7 +1,7 @@
 #include "INavigable.h"
 #include "String.h"
 
-#include <glib.h>
+#include <glibmm.h>
 
 namespace lb {
 

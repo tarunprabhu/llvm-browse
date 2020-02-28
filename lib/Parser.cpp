@@ -10,7 +10,7 @@
 #include "MDNode.h"
 #include "Value.h"
 
-#include <glib.h>
+#include <glibmm.h>
 
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/Bitcode/BitcodeReader.h>
