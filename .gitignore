@@ -33,6 +33,17 @@
 
 # Python
 *.pyc
+*.pyx
 __pycache__/
 build/
+build_cmake/
+dist/
 *.egg-info
+*.whl
+
+# GTK-specific resource files
+*.gresource
+
+# Any icons to be installed should be generated from the .svg files 
+# at build time and then installed
+*.png

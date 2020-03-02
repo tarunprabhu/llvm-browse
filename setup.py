@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from distutils.errors import DistutilsArgError
+from glob import glob
 import os
 import subprocess as process
 import setuptools
@@ -14,7 +15,11 @@ from shutil import rmtree
 
 version = '0.1'
 source_dir = os.path.abspath('.')
-build_dir = os.path.abspath('./build')
+
+# This cannot be ./build because setuptools looks there for the built libraries
+# and if cmake builds inside it, setuptools copies all the build files into
+# the module as well
+build_dir = os.path.abspath('./build_cmake')
 
 
 def check_cmake() -> str:
@@ -40,14 +45,16 @@ class CleanCommand(clean):
         clean.finalize_options(self)
 
     def run(self):
+        build_default = os.path.join(source_dir, 'build')
+        if os.path.exists(build_default):
+            rmtree(build_default)
         if os.path.exists(build_dir):
             rmtree(build_dir)
-        gresource = os.path.join(
-            source_dir, 'llvm_browse', 'llvm-browse.gresource')
-        if os.path.exists(gresource):
-            os.remove(gresource)
-        for ext in ['so', 'dylib', 'dll']:
-            for f in glob('./llvm_browse/*.{}'.format(ext), recursive=False):
+        for f in glob(os.path.join(source_dir, '*.egg-info')):
+            rmtree(f)
+        for pattern in ['llvm-browse.gresource', '*.so', '*.dylib', '*.dll']:
+            for f in glob(os.path.join(source_dir, 'llvm_browse', pattern),
+                          recursive=False):
                 os.remove(f)
         clean.run(self)
 
@@ -110,66 +117,6 @@ class BuildCommand(build):
         build.run(self)
 
 
-class DevelopCommand(develop):
-    description = develop.description
-    user_options = develop.user_options + [
-        ('llvm-dir=', None, 'Path to LLVM install root'),
-        ('make-parallel=', 'j', 'Number of parallel makes to use'),
-        ('make-verbose', None, 'Run make in verbose mode')
-    ]
-    boolean_options = develop.boolean_options + [
-        
-    ]
-
-    def initialize_options(self):
-        develop.initialize_options(self)
-        self.llvm_dir = ''
-        self.make_parallel = 0
-        self.make_verbose = False
-        self.procs = 1
-
-    def finalize_options(self):
-        develop.finalize_options(self)
-        if self.make_parallel:
-            try:
-                self.procs = int(self.make_parallel)
-                if self.procs < 1:
-                    raise DistutilsArgError(
-                        'Argument to parallel must be at least 1')
-            except ValueError:
-                raise DistutilsArgError(
-                    'Argument to parallel must be a number')
-
-    def run(self):
-        cmake = check_cmake()
-
-        os.makedirs(build_dir, exist_ok=True)
-
-        cfg = [cmake,
-               '-DCMAKE_BUILD_TYPE=Debug',
-               '-DPROJECT_VERSION={}'.format(version),
-               '-DLLVM_LINK_SHARED=On',
-               '-DLLVM_LINK_LIBLLVM=On']
-        if self.llvm_dir:
-            cfg.append('-DLLVM_INSTALLED={}'.format(self.llvm_dir))
-        cfg.extend(['-B', build_dir])
-        cfg.extend(['-S', source_dir])
-
-        make = ['make']
-        if self.make_verbose:
-            make.append('VERBOSE=1')
-        if self.procs:
-            make.append('-j{}'.format(self.procs))
-
-        try:
-            process.check_call(' '.join(cfg), shell=True)
-            process.check_call(' '.join(make), cwd=build_dir, shell=True)
-        except process.SubprocessError:
-            raise RuntimeError('Cmake configuration failed')
-
-        develop.run(self)
-
-
 setup(
     name='LLVM Browse',
     version=version,
@@ -203,8 +150,6 @@ setup(
     cmdclass={
         'build': BuildCommand,
         'clean': CleanCommand,
-        'develop': DevelopCommand,
-        # 'install_lib': InstallLibCommand,
     },
     classifiers=[
         'Intended Audience :: Developers',
