@@ -5,6 +5,7 @@
 #include "GlobalAlias.h"
 #include "GlobalVariable.h"
 #include "Instruction.h"
+#include "Logging.h"
 #include "MDNode.h"
 #include "Parser.h"
 #include "StructType.h"
@@ -13,13 +14,11 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include <glibmm.h>
-
 namespace lb {
 
 Module::Module(std::unique_ptr<llvm::Module> module,
-               llvm::LLVMContext& context) :
-    context(context),
+               std::unique_ptr<llvm::LLVMContext> context) :
+    context(std::move(context)),
     llvm(std::move(module)) {
   ;
 }
@@ -38,7 +37,7 @@ bool
 Module::contains(const llvm::MDNode& llvm) const {
   return mmap.find(&llvm) != mmap.end();
 }
-  
+
 bool
 Module::contains_main() const {
   return buffers.find(Module::get_main_id()) != buffers.end();
@@ -283,18 +282,15 @@ Module::check_navigable(const INavigable& n) const {
     if(not check_range(range, tag)) {
       size_t begin = range.get_begin();
       size_t end   = range.get_end();
-      std::string buf;
-      llvm::raw_string_ostream ss(buf);
-      ss << "Definition mismatch\n"
-         << "  Range:    " << begin << ", " << end << "\n"
-         << "  Expected: " << tag << "\n"
-         << "  Got:      " << get_contents().substr(begin, end - begin);
-      ss.flush();
-      g_critical("\n%s", buf.c_str());
+      critical() << "Definition mismatch" << endl
+                 << "  Range:    " << begin << ", " << end << endl
+                 << "  Expected: " << tag << endl
+                 << "  Got:      " << get_contents().substr(begin, end - begin)
+                 << "\n";
       return false;
     }
   } else {
-    g_critical("Invalid definition: %s", tag.data());
+    critical() << "Invalid definition: " << tag << "\n";
     return false;
   }
   return true;
@@ -306,14 +302,12 @@ Module::check_uses(const INavigable& n) const {
     if(not check_range(use, n.get_tag())) {
       size_t begin = use.get_begin();
       size_t end   = use.get_end();
-      std::string buf;
-      llvm::raw_string_ostream ss(buf);
-      ss << "Use mismatch\n"
-         << "  Range:    " << begin << ", " << end << "\n"
-         << "  Expected: " << n.get_tag() << "\n"
-         << "  Got:      " << get_contents().substr(begin, end - begin);
-      ss.flush();
-      g_critical("\n%s", buf.c_str());
+
+      critical() << "Use mismatch" << endl
+                 << "  Range:    " << begin << ", " << end << endl
+                 << "  Expected: " << n.get_tag() << endl
+                 << "  Got:      " << get_contents().substr(begin, end - begin)
+                 << "\n";
       return false;
     }
   }
@@ -329,7 +323,7 @@ Module::check_uses(const INavigable& n) const {
 
 bool
 Module::check_top_level() const {
-  g_message("Checking top-level entities");
+  message() << "Checking top-level entities\n";
   for(const StructType* sty : structs())
     if(not check_navigable(*sty))
       return false;
@@ -349,15 +343,15 @@ bool
 Module::check_all(bool check_metadata) const {
   if(not check_top_level())
     return false;
-  g_message("Checking uses of aliases");
+  message() << "Checking uses of aliases\n";
   for(const GlobalAlias* a : aliases())
     if(not check_uses(*a))
       return false;
-  g_message("Checking uses of globals");
+  message() << "Checking uses of globals\n";
   for(const GlobalVariable* g : globals())
     if(not check_uses(*g))
       return false;
-  g_message("Checking uses of functions");
+  message() << "Checking uses of functions\n";
   for(const Function* f : functions()) {
     if(not check_uses(*f))
       return false;
@@ -380,19 +374,20 @@ Module::check_all(bool check_metadata) const {
     }
   }
   if(check_metadata) {
-    g_message("Checking metadata");
+    message() << "Checking metadata\n";
     for(const MDNode* md : metadata())
-      if(not check_navigable(*md) or not check_uses(*md)) 
+      if(not check_navigable(*md) or not check_uses(*md))
         return false;
   }
   return true;
 }
 
 std::unique_ptr<Module>
-Module::create(const std::string& file, llvm::LLVMContext& context) {
+Module::create(const std::string& file) {
   std::unique_ptr<Module> module(nullptr);
+  std::unique_ptr<llvm::LLVMContext> context(new llvm::LLVMContext());
 
-  g_message("Opening file");
+  message() << "Opening file\n";
   if(llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> file_or_err
      = llvm::MemoryBuffer::getFile(file)) {
     std::unique_ptr<llvm::MemoryBuffer> fbuf = std::move(file_or_err.get());
@@ -406,20 +401,20 @@ Module::create(const std::string& file, llvm::LLVMContext& context) {
       if(llvm::isBitcode(
              reinterpret_cast<const unsigned char*>(fbuf->getBufferStart()),
              reinterpret_cast<const unsigned char*>(fbuf->getBufferEnd())))
-        std::tie(llvm, mbuf) = parser.parse_bc(std::move(fbuf), context);
+        std::tie(llvm, mbuf) = parser.parse_bc(std::move(fbuf), *context);
       else
-        std::tie(llvm, mbuf) = parser.parse_ir(std::move(fbuf), context);
+        std::tie(llvm, mbuf) = parser.parse_ir(std::move(fbuf), *context);
 
       if(llvm) {
-        module.reset(new Module(std::move(llvm), context));
+        module.reset(new Module(std::move(llvm), std::move(context)));
         module->add_main(std::move(mbuf));
         parser.link(*module);
       }
     } else {
-      g_error("Could not find LLVM bitcode or IR");
+      critical() << "Could not find LLVM bitcode or IR\n";
     }
   } else {
-    g_error("Could not open file");
+    critical() << "Could not open file\n";
   }
 
   return module;

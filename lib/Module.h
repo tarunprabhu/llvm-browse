@@ -35,7 +35,7 @@ class Value;
 //
 class Module {
 protected:
-  llvm::LLVMContext& context;
+  std::unique_ptr<llvm::LLVMContext> context;
   std::unique_ptr<llvm::Module> llvm;
   std::vector<std::unique_ptr<Value>> values;
   std::vector<std::unique_ptr<MDNode>> mds;
@@ -59,7 +59,8 @@ public:
   using StructIterator   = decltype(m_structs)::const_iterator;
 
 protected:
-  Module(std::unique_ptr<llvm::Module> module, llvm::LLVMContext& context);
+  Module(std::unique_ptr<llvm::Module> module,
+         std::unique_ptr<llvm::LLVMContext> context);
   BufferId get_next_available_id();
 
   template<typename T = Value>
@@ -159,8 +160,7 @@ public:
   }
 
 public:
-  static std::unique_ptr<Module> create(const std::string& file,
-                                        llvm::LLVMContext& context);
+  static std::unique_ptr<Module> create(const std::string& file);
 
   static constexpr BufferId get_invalid_id() {
     return -1;

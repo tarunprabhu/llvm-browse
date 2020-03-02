@@ -1,30 +1,34 @@
 #!/usr/bin/env python3
 
+from .ui import UI
+from .options import Options
 from typing import Union, List
 import gi
 gi.require_version('GLib', '2.0')
 gi.require_version('GObject', '2.0')
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '4')
-from gi.repository import GLib, GObject, Gtk, GtkSource # NOQA: E402
+from gi.repository import GLib, GObject, Gtk, GtkSource  # NOQA: E402
 
-from options import Options
-from ui import UI
+# Not sure why I need to register the GtkSourceView, but best to do it
+# here so we can be sure that it gets registered before anything else
+GObject.type_register(GtkSource.View)
 
-class LLVMBrowse(Gtk.Application):
+
+class Application(Gtk.Application):
     llvm = GObject.Property(
-        type=str,
-        default='',
+        type=GObject.TYPE_UINT64,
+        default=0,
         nick='llvm',
         blurb='The path to the LLVM file currently shown or ""')
 
     # This property is here because we cannot bind the LLVM string property
-    # directly to boolean properties of widgets because we can't set 
+    # directly to boolean properties of widgets because we can't set
     # transform functions when binding properties
     loaded = GObject.Property(
         type=bool,
         default=False,
-        nick='opened',
+        nick='loaded',
         blurb='True if a LLVM file has been loaded')
 
     len = GObject.Property(type=int, default=0)

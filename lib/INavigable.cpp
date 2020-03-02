@@ -1,8 +1,6 @@
 #include "INavigable.h"
 #include "String.h"
 
-#include <glibmm.h>
-
 namespace lb {
 
 static bool

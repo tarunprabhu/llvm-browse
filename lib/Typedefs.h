@@ -7,6 +7,11 @@ namespace lb {
 
 using BufferId = uint64_t;
 
+// Empty new line type used to align the output stream 
+struct NewLineT {
+	;
+};
+
 } // namespace lb
 
 #endif // LLVM_BROWSE_TYPEDEFS_H

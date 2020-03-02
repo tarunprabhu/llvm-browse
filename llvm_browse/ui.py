@@ -13,7 +13,7 @@ class UI(GObject.GObject):
 
         # FIXME: Read the glade UI description from a resource file
         self.builder = Gtk.Builder.new_from_file(
-            '/home/tarun/code/llvm-browse/ui/llvm-browse.glade')
+            '/home/tarun/code/llvm-browse/resources/ui/llvm-browse.glade')
 
         self.app = app
         self.options: Options = self.app.options

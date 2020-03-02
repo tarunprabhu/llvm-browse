@@ -6,11 +6,10 @@
 #include "GlobalVariable.h"
 #include "Instruction.h"
 #include "INavigable.h"
+#include "Logging.h"
 #include "Module.h"
 #include "MDNode.h"
 #include "Value.h"
-
-#include <glibmm.h>
 
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -43,7 +42,7 @@ Parser::Parser() : local_slots(nullptr), global_slots(nullptr) {
 std::tuple<std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::MemoryBuffer>>
 Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
                  llvm::LLVMContext& context) {
-  g_message("Parsing IR");
+  message() << "Parsing IR\n";
 
   global_slots.reset(new llvm::SlotMapping());
   std::unique_ptr<llvm::Module> module;
@@ -56,7 +55,7 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
     out = std::move(in);
     ir  = out->getBuffer();
   } else {
-    g_error("Error parsing IR: %s", error.getMessage().data());
+    critical() << "Error parsing IR: " << error.getMessage() << "\n";
   }
 
   return std::make_tuple(std::move(module), std::move(out));
@@ -65,7 +64,7 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
 std::tuple<std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::MemoryBuffer>>
 Parser::parse_bc(std::unique_ptr<llvm::MemoryBuffer> in,
                  llvm::LLVMContext& context) {
-  g_message("Parsing bitcode");
+  message() << "Parsing bitcode\n";
 
   // When parsing a bitcode, we convert it back to IR and parse the IR instead.
   // It's the only way to get the slot numbers for metadata nodes
@@ -78,14 +77,14 @@ Parser::parse_bc(std::unique_ptr<llvm::MemoryBuffer> in,
   std::unique_ptr<llvm::MemoryBuffer> out;
   if(llvm::Expected<std::unique_ptr<llvm::Module>> expected
      = llvm::parseBitcodeFile(in->getMemBufferRef(), tmp)) {
-    g_message("Converting bitcode to IR");
+    message() << "Converting bitcode to IR\n";
     std::string s;
     llvm::raw_string_ostream ss(s);
     ss << *expected.get();
     return parse_ir(llvm::MemoryBuffer::getMemBufferCopy(llvm::StringRef(s)),
                     context);
   } else {
-    g_error("Error parsing bitcode");
+    critical() << "Error parsing bitcode\n";
   }
 
   return std::make_tuple(std::move(module), std::move(out));
@@ -127,7 +126,7 @@ Parser::find(llvm::StringRef key,
       }
       break;
     default:
-      g_critical("Internal error: Unknown Lookback type");
+      error() << "Internal error: Unknown Lookback type\n";
       break;
     }
     // If not, record that we have seen this match before and continue
@@ -152,7 +151,7 @@ Parser::find_and_move(llvm::StringRef key, Lookback prev, size_t& cursor) {
   if(found != llvm::StringRef::npos)
     cursor = found + key.size();
   else
-    g_error("Could not find key in IR: %s", key.data());
+    critical() << "Could not find key in IR: " << key << "\n";
   return found;
 }
 
@@ -183,7 +182,7 @@ Parser::find_function(llvm::StringRef func,
     } else if(seen.insert(found).second) {
       return find_function(func, prefix, cursor, seen);
     } else {
-      g_error("Could not find function in IR: %s", func.data());
+      critical() << "Could not find function in IR: " << func << "\n";
     }
   }
   return llvm::StringRef::npos;
@@ -221,11 +220,7 @@ Parser::collect_constants(const llvm::Constant* c,
   } else if(isa<llvm::ConstantData>(c) or isa<llvm::BlockAddress>(c)) {
     ;
   } else {
-    std::string buf;
-    llvm::raw_string_ostream ss(buf);
-    ss << *c;
-    ss.flush();
-    g_critical("Unknown constant type: %s", buf.c_str());
+    critical() << "Unknown constant type: " << *c << "\n";
   }
 }
 
@@ -313,7 +308,7 @@ Parser::link(Module& module) {
 
   llvm::Module& llvm = module.get_llvm();
 
-  g_message("Reading types");
+  message() << "Reading types\n";
   for(llvm::StructType* llvm_sty : llvm.getIdentifiedStructTypes()) {
     // TODO: At some point, we'll deal with unnamed struct types
     // but right now, I'm not sure how to get a handle to them in the IR
@@ -322,14 +317,11 @@ Parser::link(Module& module) {
       size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
       sty.set_defn_range(SourceRange(pos, pos + sty.get_tag().size()));
     } else {
-      std::string buf;
-      llvm::raw_string_ostream ss(buf);
-      ss << llvm_sty;
-      g_warning("Skipping unnamed struct type: %s", buf.c_str());
+      warning() << "Skipping unnamed struct type: " << llvm_sty << "\n";
     }
   }
 
-  g_message("Reading global variables");
+  message() << "Reading global variables\n";
   for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
     // TODO: At some point, we'll deal with unnamed globals. Right now,
     // we stick to named globals because we can definitely get a handle to
@@ -338,7 +330,8 @@ Parser::link(Module& module) {
       GlobalVariable& g = module.add(llvm_g);
       size_t pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
       if(pos == llvm::StringRef::npos)
-        g_error("Could not find global definition: %s", g.get_tag().data());
+        critical() << "Could not find global definition: " << g.get_tag()
+                   << "\n";
       else
         g.set_defn_range(SourceRange(pos, pos + g.get_tag().size()));
 
@@ -347,50 +340,49 @@ Parser::link(Module& module) {
       // for(const llvm::MDNode* md : get_metadata(llvm_g))
       //   wl.insert(md);
     } else {
-      std::string buf;
-      llvm::raw_string_ostream ss(buf);
-      ss << llvm_g;
-      g_warning("Skipping unnamed global: %s", buf.c_str());
+      warning() << "Skipping unnamed global: " << llvm_g << "\n";
     }
   }
 
-  g_message("Reading global aliases");
+  message() << "Reading global aliases\n";
   for(llvm::GlobalAlias& llvm_a : llvm.aliases()) {
     GlobalAlias& a = module.add(llvm_a);
     size_t pos     = find_and_move(a.get_tag(), Lookback::Newline, cursor);
     if(pos == llvm::StringRef::npos)
-      g_error("Could not find alias definition: %s", a.get_tag().data());
+      critical() << "Could not find alias definition: " << a.get_tag() << "\n";
     else
       a.set_defn_range(SourceRange(pos, pos + a.get_tag().size()));
   }
 
   // Do this in two passes because there may be circular references
-  g_message("Reading functions");
+  message() << "Reading functions\n";
   for(llvm::Function& llvm_f : llvm.functions()) {
     Function& f            = module.add(llvm_f);
     llvm::StringRef prefix = llvm_f.size() ? "define" : "declare";
     size_t pos             = find_function(f.get_tag(), prefix, cursor);
     if(pos == llvm::StringRef::npos)
-      g_error("Could not find function definition: %s", f.get_tag().data());
+      critical() << "Could not find function definition: " << f.get_tag()
+                 << "\n";
     else
       f.set_defn_range(SourceRange(pos, pos + f.get_tag().size()));
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
   }
 
-  g_message("Reading metadata");
+  message() << "Reading metadata\n";
   for(const auto& i : global_slots->MetadataNodes) {
     MDNode& md = module.add(*i.second, i.first);
     buf.clear();
     ss << md.get_tag() << " =";
     size_t pos = find_and_move(ss.str(), Lookback::Newline, cursor);
     if(pos == llvm::StringRef::npos)
-      g_error("Could not find metadata definition: %s", md.get_tag().data());
+      critical() << "Could not find metadata definition: " << md.get_tag()
+                 << "\n";
     else
       md.set_defn_range(SourceRange(pos, pos + md.get_tag().size()));
   }
 
-  g_message("Processing global variables");
+  message() << "Processing global variables\n";
   for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
     // The global might not be in the module if it doesn't have a name
     if(module.contains(llvm_g)) {
@@ -401,7 +393,7 @@ Parser::link(Module& module) {
     }
   }
 
-  g_message("Processing functions");
+  message() << "Processing functions\n";
   for(llvm::Function& llvm_f : llvm.functions()) {
     // For functions that are declared, we don't even try to do anything
     if(not llvm_f.size())
@@ -509,13 +501,9 @@ Parser::link(Module& module) {
             collect_constants(c, module, ops);
           else if(isa<llvm::MetadataAsValue>(op))
             ;
-          else {
-            std::string buf;
-            llvm::raw_string_ostream ss(buf);
-            ss << *op;
-            ss.flush();
-            g_critical("Unexpected instruction operand: %s", buf.c_str());
-          }
+          else
+            critical() << "Unexpected instruction operand: " << *op << "\n";
+
         for(const llvm::MDNode* llvm_md : get_metadata(llvm_inst)) {
           ops.push_back(&module.get(*llvm_md));
           // This will be used to collect all the MDNode's seen in function
@@ -568,7 +556,7 @@ Parser::link(Module& module) {
       f.set_llvm_range(SourceRange(f_begin, f_end + 1));
   }
 
-  g_message("Processing metadata");
+  message() << "Processing metadata\n";
   // Add MDNodes reachable from NamedMDNodes
   for(const llvm::NamedMDNode& nmd : llvm.named_metadata())
     for(const llvm::MDNode* md : nmd.operands())
@@ -613,7 +601,8 @@ Parser::link(Module& module) {
         if(pos != llvm::StringRef::npos)
           op.add_use(SourceRange(pos, pos + op.get_tag().size()));
         else
-          g_warning("Could not find metadata operand: %s", op.get_tag().data());
+          warning() << "Could not find metadata operand: " << op.get_tag()
+                    << "\n";
       }
     }
   }
