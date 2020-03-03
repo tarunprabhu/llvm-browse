@@ -7,34 +7,24 @@
 
 #include "Typedefs.h"
 
-namespace lb {
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
 
-class Module;
-
-class SourceRange {
-protected:
-  BufferId id;
+struct SourceRange {
   size_t begin;
   size_t end;
 
-public:
   SourceRange();
   SourceRange(size_t begin, size_t end);
-  SourceRange(BufferId id, size_t begin, size_t end);
-  virtual ~SourceRange() = default;
 
-  bool is_valid() const;
-  BufferId get_id() const;
-  size_t get_begin() const;
-  size_t get_end() const;
-  llvm::StringRef get_text(const Module& module) const;
-
-public:
   operator bool() const {
-    return is_valid();
+    return (begin > 0) and (end > 0);
   }
 };
 
-} // namespace lb
+#ifdef __cplusplus
+} // extern "C"
+#endif // __cpluspls
 
 #endif // LLVM_BROWSE_SOURCE_RANGE_H

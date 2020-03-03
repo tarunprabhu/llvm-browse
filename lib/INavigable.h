@@ -26,6 +26,10 @@ namespace lb {
 //
 class INavigable {
 protected:
+  // The tag is the "label" of the entity in the LLVM IR. For instructions, 
+  // this might have the form "^%.+$" where the characters after the percent 
+  // sign are typically numbers but they don't have to be. 
+  // For struct types, this will be "%.+", for globals, this will be "^@.+$"
   std::string tag;
 
   // The defn range is the range of characters in the IR that correspond to
@@ -37,13 +41,18 @@ protected:
   // that don't return a value, it may cover the instruction opcode although
   // it might be better if it is of length 0 and positioned just at the start
   // of the op code
-  SourceRange defn;
+  SourceRange llvm_defn;
 
   // The LLVM range is the range in characters that the entity covers in
   // the IR. For functions, this is the entire body, for basic blocks, all
   // the characters from the start of the first instruction in the block to
   // the end of the last. It may be invalid for other entities
-  SourceRange llvm;
+  SourceRange llvm_range;
+
+  // The source defn is the range in characters in the source code that 
+  // the definition of the entity covers. For functions and globals, this 
+  // will simply span the beginning to the end of the name in the source code
+  SourceRange source_defn;
 
   // The source range is the range in characters in the source code that the
   // entity covers. This is a somewhat more nebulous range because there may not
@@ -53,7 +62,7 @@ protected:
   // Still, this is mainly here so we have a decent starting point at which
   // to position the cursor in the source even if we can't do anything else
   // beyond that 
-  SourceRange source;
+  SourceRange source_range;
 
   // This is sort of messy because not everything that is navigable ought to
   // have a use. The exeception are struct types that also have a definition
@@ -82,8 +91,9 @@ public:
   void sort_uses();
   void add_use(const SourceRange& range);
 
-  void set_defn_range(const SourceRange& range);
+  void set_llvm_defn(const SourceRange& range);
   void set_llvm_range(const SourceRange& range);
+  void set_source_defn(const SourceRange& range);
   void set_source_range(const SourceRange& range);
 
   Iterator begin() const;
@@ -92,8 +102,13 @@ public:
   unsigned get_num_uses() const;
   bool has_tag() const;
   llvm::StringRef get_tag() const;
-  const SourceRange& get_defn_range() const;
+  bool has_llvm_defn() const;
+  bool has_llvm_range() const;
+  bool has_source_defn() const;
+  bool has_source_range() const;
+  const SourceRange& get_llvm_defn() const;
   const SourceRange& get_llvm_range() const;
+  const SourceRange& get_source_defn() const;
   const SourceRange& get_source_range() const;
 };
 

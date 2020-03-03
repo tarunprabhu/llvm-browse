@@ -315,7 +315,7 @@ Parser::link(Module& module) {
     if(llvm_sty->hasName()) {
       StructType& sty = module.add(llvm_sty);
       size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
-      sty.set_defn_range(SourceRange(pos, pos + sty.get_tag().size()));
+      sty.set_llvm_defn(SourceRange(pos, pos + sty.get_tag().size()));
     } else {
       warning() << "Skipping unnamed struct type: " << llvm_sty << "\n";
     }
@@ -333,7 +333,7 @@ Parser::link(Module& module) {
         critical() << "Could not find global definition: " << g.get_tag()
                    << "\n";
       else
-        g.set_defn_range(SourceRange(pos, pos + g.get_tag().size()));
+        g.set_llvm_defn(SourceRange(pos, pos + g.get_tag().size()));
 
       // FIXME: Skipping any metadata on global variables because I can't
       // figure out how to get just the non-debug 
@@ -351,7 +351,7 @@ Parser::link(Module& module) {
     if(pos == llvm::StringRef::npos)
       critical() << "Could not find alias definition: " << a.get_tag() << "\n";
     else
-      a.set_defn_range(SourceRange(pos, pos + a.get_tag().size()));
+      a.set_llvm_defn(SourceRange(pos, pos + a.get_tag().size()));
   }
 
   // Do this in two passes because there may be circular references
@@ -364,7 +364,7 @@ Parser::link(Module& module) {
       critical() << "Could not find function definition: " << f.get_tag()
                  << "\n";
     else
-      f.set_defn_range(SourceRange(pos, pos + f.get_tag().size()));
+      f.set_llvm_defn(SourceRange(pos, pos + f.get_tag().size()));
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
   }
@@ -379,7 +379,7 @@ Parser::link(Module& module) {
       critical() << "Could not find metadata definition: " << md.get_tag()
                  << "\n";
     else
-      md.set_defn_range(SourceRange(pos, pos + md.get_tag().size()));
+      md.set_llvm_defn(SourceRange(pos, pos + md.get_tag().size()));
   }
 
   message() << "Processing global variables\n";
@@ -389,7 +389,7 @@ Parser::link(Module& module) {
       GlobalVariable& g = module.get(llvm_g);
       if(llvm_g.hasInitializer())
         associate_values(collect_constants(llvm_g.getInitializer(), module),
-                         g.get_defn_range().get_end());
+                         g.get_llvm_defn().end);
     }
   }
 
@@ -402,7 +402,7 @@ Parser::link(Module& module) {
     Function& f = module.get(llvm_f);
     // Reposition the cursor at the function definition because we know that
     // things will  be closer
-    cursor = f.get_defn_range().get_end();
+    cursor = f.get_llvm_defn().end;
     local_slots->incorporateFunction(llvm_f);
     size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
     for(llvm::Argument& llvm_arg : llvm_f.args()) {
@@ -464,9 +464,9 @@ Parser::link(Module& module) {
 
         size_t i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
         if(llvm_inst.getType()->isVoidTy())
-          inst.set_defn_range(SourceRange(i_begin, i_begin));
+          inst.set_llvm_defn(SourceRange(i_begin, i_begin));
         else
-          inst.set_defn_range(SourceRange(i_begin, i_begin + tag.size()));
+          inst.set_llvm_defn(SourceRange(i_begin, i_begin + tag.size()));
 
         // Because we don't want to even try to parse the instruction operands,
         // everything will have to be text-based matching. To reduce the
@@ -524,8 +524,8 @@ Parser::link(Module& module) {
       // definition of a basic block other than to the start of the first
       // instruction
       size_t bb_begin
-          = module.get(llvm_bb.front()).get_defn_range().get_begin();
-      bb.set_defn_range(SourceRange(bb_begin, bb_begin));
+          = module.get(llvm_bb.front()).get_llvm_defn().begin;
+      bb.set_llvm_range(SourceRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular
@@ -551,7 +551,7 @@ Parser::link(Module& module) {
         bb.set_llvm_range(SourceRange(bb_begin, bb_end));
     }
 
-    size_t f_end = module.get(llvm_f.back()).get_defn_range().get_end();
+    size_t f_end = module.get(llvm_f.back()).get_llvm_defn().end;
     if(f_end != llvm::StringRef::npos)
       f.set_llvm_range(SourceRange(f_begin, f_end + 1));
   }
@@ -586,7 +586,7 @@ Parser::link(Module& module) {
   sort_by_tag_name(mds);
   for(MDNode* md : mds) {
     const llvm::MDNode& llvm_md = md->get_llvm();
-    cursor                      = md->get_defn_range().get_end();
+    cursor                      = md->get_llvm_defn().end;
     for(unsigned i = 0; i < llvm_md.getNumOperands(); i++) {
       if(const auto* mop
          = dyn_cast_or_null<llvm::MDNode>(llvm_md.getOperand(i))) {

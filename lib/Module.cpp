@@ -230,6 +230,11 @@ Module::get_contents(BufferId id) const {
   return buffers.at(id)->getBuffer();
 }
 
+const char*
+Module::get_contents_as_cstr(BufferId id) const {
+  return buffers.at(id)->getBufferStart();
+}
+
 llvm::iterator_range<Module::AliasIterator>
 Module::aliases() const {
   return llvm::iterator_range<AliasIterator>(m_aliases);
@@ -255,6 +260,26 @@ Module::structs() const {
   return llvm::iterator_range<StructIterator>(m_structs);
 }
 
+unsigned Module::get_num_aliases() const {
+  return m_aliases.size();
+}
+
+unsigned Module::get_num_functions() const {
+  return m_functions.size();
+}
+
+unsigned Module::get_num_globals() const {
+  return m_globals.size();
+}
+
+unsigned Module::get_num_metadata() const {
+  return m_metadata.size();
+}
+
+unsigned Module::get_num_structs() const {
+  return m_structs.size();
+}
+
 llvm::Module&
 Module::get_llvm() {
   return *llvm;
@@ -267,8 +292,8 @@ Module::get_llvm() const {
 
 bool
 Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
-  size_t begin          = range.get_begin();
-  size_t end            = range.get_end();
+  size_t begin          = range.begin;
+  size_t end            = range.end;
   llvm::StringRef slice = get_contents().substr(begin, end - begin);
   if(slice != tag)
     return false;
@@ -278,10 +303,10 @@ Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
 bool
 Module::check_navigable(const INavigable& n) const {
   llvm::StringRef tag = n.get_tag();
-  if(const SourceRange& range = n.get_defn_range()) {
+  if(const SourceRange& range = n.get_llvm_defn()) {
     if(not check_range(range, tag)) {
-      size_t begin = range.get_begin();
-      size_t end   = range.get_end();
+      size_t begin = range.begin;
+      size_t end   = range.end;
       critical() << "Definition mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << tag << endl
@@ -300,8 +325,8 @@ bool
 Module::check_uses(const INavigable& n) const {
   for(const SourceRange& use : n.uses()) {
     if(not check_range(use, n.get_tag())) {
-      size_t begin = use.get_begin();
-      size_t end   = use.get_end();
+      size_t begin = use.begin;
+      size_t end   = use.end;
 
       critical() << "Use mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
@@ -414,7 +439,7 @@ Module::create(const std::string& file) {
       critical() << "Could not find LLVM bitcode or IR\n";
     }
   } else {
-    critical() << "Could not open file\n";
+    error() << "Could not open file: " << file << "\n";
   }
 
   return module;

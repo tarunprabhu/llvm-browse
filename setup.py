@@ -62,7 +62,7 @@ class CleanCommand(clean):
 class BuildCommand(build):
     description = build.description
     user_options = build.user_options + [
-        ('build-mode=', None, 'Must be one of "Debug" or "Release"'),
+        ('build-debug', None, 'Set the CMake build type to "Debug"'),
         ('llvm-dir=', None, 'Path to LLVM install root'),
         ('llvm-link-libllvm', None, 'Use libLLVM if available'),
         ('llvm-link-shared', None, 'Link against LLVM shared libraries'),
@@ -71,7 +71,7 @@ class BuildCommand(build):
 
     def initialize_options(self):
         build.initialize_options(self)
-        self.build_mode = 'Release'
+        self.build_debug = False
         self.llvm_link_shared = False
         self.llvm_link_libllvm = False
         self.llvm_dir = ''
@@ -79,9 +79,6 @@ class BuildCommand(build):
 
     def finalize_options(self):
         build.finalize_options(self)
-        if self.build_mode not in ['Debug', 'Release']:
-            raise DistUtilsArgError('Invalid value for build-mode. '
-                                    'Must be one of "Debug" or "Release"')
 
     def run(self):
         cmake = check_cmake()
@@ -90,7 +87,8 @@ class BuildCommand(build):
 
         cfg = [
             cmake,
-            '-DCMAKE_BUILD_TYPE={}'.format(self.build_mode),
+            '-DCMAKE_BUILD_TYPE={}'.format(
+                'Debug' if self.build_debug else 'Release'),
             '-DPROJECT_VERSION={}'.format(version),
         ]
         if self.llvm_dir:

@@ -16,9 +16,7 @@ INavigable::sort_uses() {
   std::sort(m_uses.begin(),
             m_uses.end(),
             [](const SourceRange& l, const SourceRange& r) {
-              return (l.get_id() < r.get_id())
-                     and (l.get_begin() < r.get_begin())
-                     and (l.get_end() < r.get_end());
+              return ((l.begin < r.begin) and (l.end < r.end));
             });
 }
 
@@ -39,8 +37,8 @@ INavigable::set_tag(llvm::StringRef name) {
 
 void
 INavigable::set_tag(llvm::StringRef name,
-                   llvm::StringRef prefix,
-                   bool may_need_quotes) {
+                    llvm::StringRef prefix,
+                    bool may_need_quotes) {
   if(may_need_quotes and needs_quotes(name))
     tag = String::concat(prefix, "\"", name, "\"");
   else
@@ -48,18 +46,23 @@ INavigable::set_tag(llvm::StringRef name,
 }
 
 void
-INavigable::set_defn_range(const SourceRange& range) {
-  defn = range;
+INavigable::set_llvm_defn(const SourceRange& range) {
+  llvm_defn = range;
 }
 
 void
 INavigable::set_llvm_range(const SourceRange& range) {
-  llvm = range;
+  llvm_range = range;
+}
+
+void
+INavigable::set_source_defn(const SourceRange& range) {
+  source_defn = range;
 }
 
 void
 INavigable::set_source_range(const SourceRange& range) {
-  source = range;
+  source_range = range;
 }
 
 bool
@@ -92,19 +95,39 @@ INavigable::get_num_uses() const {
   return m_uses.size();
 }
 
+bool INavigable::has_llvm_defn() const {
+  return llvm_defn;
+}
+
+bool INavigable::has_llvm_range() const {
+  return llvm_range;
+}
+
+bool INavigable::has_source_defn() const {
+  return source_defn;
+}
+
+bool INavigable::has_source_range() const {
+  return source_range;
+}
+
 const SourceRange&
-INavigable::get_defn_range() const {
-  return defn;
+INavigable::get_llvm_defn() const {
+  return llvm_defn;
 }
 
 const SourceRange&
 INavigable::get_llvm_range() const {
-  return llvm;
+  return llvm_range;
 }
 
 const SourceRange&
+INavigable::get_source_defn() const {
+  return source_defn;
+}
+const SourceRange&
 INavigable::get_source_range() const {
-  return source;
+  return source_range;
 }
 
 } // namespace lb

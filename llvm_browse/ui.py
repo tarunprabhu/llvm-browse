@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from .clib import lb_module_get_llvm
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GObject', '2.0')
@@ -109,18 +110,32 @@ class UI(GObject.GObject):
         if self.options.window_maximized:
             self['win_main'].maximize()
 
+    def do_open(self):
+        print('do_open:', self.app.llvm)
+        self['srcvw_llvm'].get_buffer().set_text(
+            lb_module_get_llvm(self.app.llvm))
+
     def on_open(self, *args) -> bool:
         dlg = self['dlg_file']
         response = dlg.run()
-        if response == Gtk.ResponseType.RESPONSE_OK:
-            pass
+        if response == Gtk.ResponseType.OK:
+            # FIXME: Do this in a separate thread instead of blocking the
+            # UI by doing this here
+            self.app.action_open(dlg.get_filename())
         dlg.hide()
         return True
 
     def on_close(self, *args) -> bool:
+        self.app.action_close()
+        self['srcvw_llvm'].get_buffer().set_text('')
         return True
 
     def on_reload(self, *args) -> bool:
+        # FIXME: Do this in a separate thread instead of blocking the UI
+        # by doing this
+        if self.app.action_reload():
+            self['srcvw_llvm'].get_buffer().set_text(
+                self.app.module.get_llvm())
         return False
 
     def on_quit(self, *args) -> bool:

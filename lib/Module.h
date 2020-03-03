@@ -49,7 +49,6 @@ protected:
   std::map<const llvm::Value*, Value*> vmap;
   std::map<const llvm::MDNode*, MDNode*> mmap;
   std::map<llvm::StructType*, StructType*> tmap;
-  bool valid;
 
 public:
   using AliasIterator    = decltype(m_aliases)::const_iterator;
@@ -82,7 +81,7 @@ protected:
   const T* get(const llvm::Value* llvm) const {
     return llvm::cast<T>(vmap.at(llvm));
   }
-  
+
   template<typename T,
            typename LLVM,
            std::enable_if_t<!std::is_pointer<LLVM>::value, int> = 0>
@@ -102,7 +101,7 @@ protected:
   GlobalVariable& get(const llvm::GlobalVariable& llvm);
   MDNode& get(const llvm::MDNode& llvm);
   Value& get(const llvm::Value& llvm);
-  
+
   bool check_range(const SourceRange& range, llvm::StringRef tag) const;
   bool check_uses(const INavigable& navigable) const;
   bool check_navigable(const INavigable& navigable) const;
@@ -122,6 +121,7 @@ public:
 
   llvm::MemoryBufferRef get_buffer(BufferId id = get_main_id()) const;
   llvm::StringRef get_contents(BufferId id = get_main_id()) const;
+  const char* get_contents_as_cstr(BufferId id = get_main_id()) const;
 
   // These should be refactored at some point so they are not public
   Argument& add(llvm::Argument& llvm);
@@ -149,6 +149,12 @@ public:
   llvm::iterator_range<MetadataIterator> metadata() const;
   llvm::iterator_range<StructIterator> structs() const;
 
+  unsigned get_num_aliases() const;
+  unsigned get_num_functions() const;
+  unsigned get_num_globals() const;
+  unsigned get_num_metadata() const;
+  unsigned get_num_structs() const;
+
   llvm::Module& get_llvm();
   const llvm::Module& get_llvm() const;
 
@@ -156,7 +162,7 @@ public:
   bool check_all(bool metadata) const;
 
   explicit operator bool() const {
-    return valid;
+    return llvm.get();
   }
 
 public:

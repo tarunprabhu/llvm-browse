@@ -5,14 +5,13 @@ namespace lb {
 const NewLineT endl;
 
 thread_local static FormattedStream g_message("Message",
-                                          llvm::raw_ostream::Colors::GREEN);
-thread_local static FormattedStream g_warning("Warning",
-                                              llvm::raw_ostream::Colors::YELLOW);
+                                              llvm::raw_ostream::Colors::GREEN);
+thread_local static FormattedStream
+    g_warning("Warning", llvm::raw_ostream::Colors::YELLOW);
 thread_local static FormattedStream
     g_critical("Critical", llvm::raw_ostream::Colors::MAGENTA);
 thread_local static FormattedStream g_error("Error",
                                             llvm::raw_ostream::Colors::RED);
-
 
 FormattedStream&
 message(bool start) {
@@ -44,8 +43,8 @@ error(bool start) {
 
 FormattedStream::FormattedStream(const std::string& label,
                                  llvm::raw_ostream::Colors color) :
-    label(label),
-    color(color) {
+    fs(llvm::errs()),
+    label(label), color(color) {
   ;
 }
 
@@ -61,9 +60,9 @@ FormattedStream::start() {
 
 FormattedStream&
 FormattedStream::operator<<(const NewLineT&) {
-	fs << "\n";
-	fs.PadToColumn(label.size() + 2);
-	return *this;
+  fs << "\n";
+  fs.PadToColumn(label.size() + 2);
+  return *this;
 }
 
-} // namespace label
+} // namespace lb

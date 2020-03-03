@@ -9,6 +9,7 @@ set(SOURCES
   Module.cpp
   INavigable.cpp
   Logging.cpp
+  LLVMBrowse.cpp
   Parser.cpp
   SourceRange.cpp
   String.cpp

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# from .application import Application
+from .application import Application
 
 import argparse
 
@@ -16,7 +16,6 @@ def main():
                     help='The LLVM IR file to open')
     argv = ap.parse_args()
 
-    from .application import Application
     app = Application()
     app.run(argv)
 

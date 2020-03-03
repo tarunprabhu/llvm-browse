@@ -4,8 +4,6 @@ Clickable viewer for LLVM IR which also matches it to the source code
 Build instructions:
 ------------------
 
-Environment variables that can be set on the command line:
-
-  - CMAKE: Command to be used to invoke cmake
-  - LLVM_CONFIG: Command to be used to invoke llvm-config. 
-
+<code>
+	$ python3 setup.py build [BUILD_OPTIONS] bdist_wheel && pip install --user dist/*.whl
+</code>
