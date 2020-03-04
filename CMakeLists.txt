@@ -145,36 +145,43 @@ endif()
 # then the Python bindings will also have been installed. This might not be the 
 # case but I'm not sure. Probably should find another way of doing this 
 # just in case
+
+# GObject
 set(PY_GOBJECT_VERSION 2.0)
 set(GOBJECT_PACKAGE gobject-${PY_GOBJECT_VERSION}>=2.52)
 pkg_check_modules(GOBJECT_REQUIRED ${GOBJECT_PACKAGE})
 
+# GLib
 set(PY_GLIB_VERSION 2.0)
 set(GLIB_PACKAGE glib-${PY_GLIB_VERSION}>=2.48)
 pkg_check_modules(GLIB REQUIRED ${GLIB_PACKAGE})
 
+# GTK+
 set(PY_GTK_VERSION 3.0)
 set(GTK_PACKAGE gtk+-${PY_GTK_VERSION}>=3.20)
 pkg_check_modules(GTK REQUIRED ${GTK_PACKAGE})
 
+# GDK
 set(PY_GDK_VERSION 3.0)
 set(GDK_PACKAGE gdk-${PY_GDK_VERSION}>=3.20)
 pkg_check_modules(GDK REQUIRED ${GDK_PACKAGE})
 
+# GTKSource
 set(PY_GTKSOURCE_VERSION 4)
 set(GTKSOURCE_PACKAGE gtksourceview-${PY_GTKSOURCE_VERSION}>=4)
 pkg_check_modules(GTK_SOURCE REQUIRED ${GTKSOURCE_PACKAGE})
 
+# Pango
 set(PY_PANGO_VERSION 1.0)
 set(PANGO_PACKAGE pango)
 pkg_check_modules(PANGO REQUIRED ${PANGO_PACKAGE}>=1.40)
 
+# GdkPixbuf
 set(PY_GDKPIXBUF_VERSION 2.0)
 set(GDKPIXBUF_PACKAGE gdk-pixbuf-${PY_GDKPIXBUF_VERSION})
 pkg_check_modules(GDK_PIXBUF REQUIRED ${GDKPIXBUF_PACKAGE})
 
-# Configure Gio. We only really need this to get glib-compile-resources
-#
+# GIO
 set(PY_GIO_VERSION 2.0)
 set(GIO_PACKAGE gio-${PY_GIO_VERSION})
 pkg_check_modules(GIO REQUIRED ${GIO_PACKAGE}>=2.48)
@@ -184,9 +191,9 @@ message(STATUS "Glib resources compiler: ${GLIB_COMPILE_RESOURCES}")
 # Setup global compiler options
 # Default cmake flags
 set(CMAKE_SKIP_BUILD_RPATH False)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH True)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
-set(CMAKE_INSTALL_RPATH ${Python_INSTALL_DIR}/llvm_browse)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH False)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH False)
+set(CMAKE_INSTALL_RPATH ${PROJECT_INSTALL_LIB_DIR}/llvm_browse)
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC)
 add_compile_options(
@@ -198,10 +205,7 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(LIB_LLVM_BROWSE_LIB LLVMBrowse)
 
-add_subdirectory(llvm_browse_gtk)
+add_subdirectory(bin)
 add_subdirectory(lib)
-add_subdirectory(resources)
+add_subdirectory(llvm_browse_gtk)
 add_subdirectory(llvm_browse)
-
-install(PROGRAMS bin/llvm-browse 
-  DESTINATION ${PROJECT_INSTALL_BIN_DIR})
