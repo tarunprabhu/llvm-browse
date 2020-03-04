@@ -5,6 +5,7 @@ project(llvm-browse VERSION 0.1)
 enable_language(C)
 enable_language(CXX)
 
+
 find_package(PkgConfig)
 
 #
@@ -30,45 +31,36 @@ endif()
 
 if(INSTALL_AS_USER)
   execute_process(COMMAND 
-    ${Python_EXECUTABLE} -c "import site; print(site.USER_SITE)"
-    OUTPUT_VARIABLE PROJECT_INSTALL_LIB_DIR
+    ${Python_EXECUTABLE} -m site --user-site
+    OUTPUT_VARIABLE Python_INSTALL_FULL_SITEDIR
     RESULT_VARIABLE USER_SITE_FOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(NOT USER_SITE_FOUND EQUAL 0)
-    message(FATAL_ERROR "Could not get Python sitepackage dir")
+    message(FATAL_ERROR "Could not get Python user sitepackage dir")
   endif()
   execute_process(COMMAND
-    ${Python_EXECUTABLE} 
-    -c "import sysconfig; print(sysconfig.get_paths('posix_user')['scripts'])"
-    OUTPUT_VARIABLE PROJECT_INSTALL_BIN_DIR
-    RESULT_VARIABLE SCRIPTS_DIR_FOUND
+    ${Python_EXECUTABLE} -m site --user-base
+    OUTPUT_VARIABLE CMAKE_INSTALL_PREFIX
+    RESULT_VARIABLE USER_BASE_FOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT SCRIPTS_DIR_FOUND EQUAL 0)
-    message(FATAL_ERROR "Could not get Python bin dir")
+  if(NOT USER_BASE_FOUND EQUAL 0)
+    message(FATAL_ERROR "Could not get Python user base dir")
   endif()
 else()
-  set(PROJECT_INSTALL_LIB_DIR ${Python_SITELIB})
-  execute_process(COMMAND
-    ${Python_EXECUTABLE} 
-    -c "import sysconfig; print(sysconfig.get_paths()['scripts'])"
-    OUTPUT_VARIABLE PROJECT_INSTALL_BIN_DIR
-    RESULT_VARIABLE SCRIPTS_DIR_FOUND
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT SCRIPTS_DIR_FOUND EQUAL 0)
-    message(FATAL_ERROR "Could not get Python bin dir")
-  endif()
+  set(Python_INSTALL_FULL_SITEDIR ${Python_SITELIB})
 endif()
 
-message(STATUS "Python package install directory: ${Python_INSTALL_DIR}")
-
-execute_process(COMMAND
-  ${Python_EXECUTABLE} 
-  -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
-  OUTPUT_VARIABLE Python_SOABI
-  RESULT_VARIABLE SOABI_FOUND
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT SOABI_FOUND EQUAL 0)
-  message(FATAL_ERROR "Could not get extension suffix")
+# Python_SOABI is set automatically by later versions of CMake
+if(NOT Python_SOABI)
+  execute_process(COMMAND
+    ${Python_EXECUTABLE} 
+    -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
+    OUTPUT_VARIABLE Python_SOABI
+    RESULT_VARIABLE SOABI_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT SOABI_FOUND EQUAL 0)
+    message(FATAL_ERROR "Could not get extension suffix")
+  endif()
 endif()
 
 message(STATUS "Python extension suffix: ${Python_SOABI}")
@@ -188,12 +180,37 @@ pkg_check_modules(GIO REQUIRED ${GIO_PACKAGE}>=2.48)
 pkg_get_variable(GLIB_COMPILE_RESOURCES ${GIO_PACKAGE} glib_compile_resources)
 message(STATUS "Glib resources compiler: ${GLIB_COMPILE_RESOURCES}")
 
+# This must be added after CMAKE_INSTALL_PREFIX is set
+include(GNUInstallDirs)
+message(STATUS "Installing binaries: ${CMAKE_INSTALL_FULL_BINDIR}")
+message(STATUS "Installing libs: ${CMAKE_INSTALL_FULL_LIBDIR}")
+message(STATUS "Installing Python modules: ${Python_INSTALL_FULL_SITEDIR}")
+
+set(PYTHON_MODULES llvm_browse_gtk)
+
+# Crate an uninstall target
+file(WRITE ${PROJECT_BINARY_DIR}/tmp/uninstall.sh "
+#!/bin/sh
+
+if [ -f ${PROJECT_BINARY_DIR}/install_manifest.txt ]; then
+  cat ${PROJECT_BINARY_DIR}/install_manifest.txt | xargs -L 1 rm --verbose
+  for module in ${PYTHON_MODULES}; do
+    rmdir --verbose ${Python_INSTALL_FULL_SITEDIR}/$module
+  done
+else
+  echo 'Nothing to uninstall'
+fi")
+file(COPY ${PROJECT_BINARY_DIR}/tmp/uninstall.sh
+  DESTINATION ${PROJECT_BINARY_DIR}
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+file(REMOVE_RECURSE ${PROJECT_BINARY_DIR}/tmp)
+
 # Setup global compiler options
 # Default cmake flags
 set(CMAKE_SKIP_BUILD_RPATH False)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH False)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
-set(CMAKE_INSTALL_RPATH ${PROJECT_INSTALL_LIB_DIR}/llvm_browse)
+set(CMAKE_INSTALL_RPATH ${PROJECT_INSTALL_LIB_DIR})
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC)
 add_compile_options(

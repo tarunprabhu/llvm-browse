@@ -16,7 +16,8 @@ target_link_libraries(${TARGET}
 
 set_target_properties(${TARGET} 
 	PROPERTIES
-	SUFFIX "${Python_SOABI}")
+	SUFFIX "${Python_SOABI}"
+	LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
 install(TARGETS ${TARGET}
-	DESTINATION ${PROJECT_INSTALL_LIB_DIR}/llvm_browse)
+	DESTINATION ${Python_INSTALL_FULL_SITEDIR})

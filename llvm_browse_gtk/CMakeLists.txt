@@ -14,11 +14,10 @@ set(RESOURCES
 	${PROJECT_SOURCE_DIR}/icons/64x64/llvm-browse.svg
 	${PROJECT_SOURCE_DIR}/icons/128x128/llvm-browse.svg)
 
-
 foreach(PY_FILE ${SOURCES})
 	configure_file(${PY_FILE} ${PY_FILE})
 	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PY_FILE}
-		DESTINATION ${PROJECT_INSTALL_LIB_DIR}/llvm_browse_gtk)
+		DESTINATION ${Python_INSTALL_FULL_SITEDIR}/llvm_browse_gtk)
 endforeach(PY_FILE)
 
 set(TARGET llvm-browse.gresource)
@@ -36,5 +35,4 @@ add_custom_target(${TARGET} ALL
 	DEPENDS ${GRESOURCE_TARGET}) 
 
 install(FILES ${GRESOURCE_TARGET}
-	DESTINATION ${PROJECT_INSTALL_LIB_DIR}/llvm_browse_gtk)
-
+	DESTINATION ${Python_INSTALL_FULL_SITEDIR}/llvm_browse_gtk)
