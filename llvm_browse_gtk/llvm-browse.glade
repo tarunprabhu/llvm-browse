@@ -456,7 +456,6 @@
       <action-widget response="-5">btn_file_open</action-widget>
     </action-widgets>
   </object>
-  <object class="GtkTreeModelFilter" id="fltr_contents"/>
   <object class="GtkRecentFilter" id="rfltr_main">
     <patterns>
       <pattern>*.ll</pattern>
@@ -466,8 +465,25 @@
   <object class="GtkRecentManager" id="rmgr_main">
     <property name="filename">/home/tarun/.local/share/recently-used.xbel</property>
   </object>
+  <object class="GtkTreeStore" id="trst_contents">
+    <columns>
+      <!-- column-name Handle -->
+      <column type="gulong"/>
+      <!-- column-name Display -->
+      <column type="gchararray"/>
+      <!-- column-name Tooltip -->
+      <column type="gchararray"/>
+      <!-- column-name Style -->
+      <column type="PangoStyle"/>
+    </columns>
+  </object>
+  <object class="GtkTreeModelFilter" id="trfltr_contents">
+    <property name="child_model">trst_contents</property>
+  </object>
   <object class="GtkApplicationWindow" id="win_main">
     <property name="can_focus">False</property>
+    <property name="default_width">660</property>
+    <property name="default_height">400</property>
     <child>
       <placeholder/>
     </child>
@@ -515,6 +531,7 @@
                             <property name="limit">10</property>
                             <property name="recent_manager">rmgr_main</property>
                             <property name="sort_type">mru</property>
+                            <signal name="item-activated" handler="on_open_recent" swapped="no"/>
                           </object>
                         </child>
                       </object>
@@ -964,6 +981,8 @@
                 <property name="can_focus">True</property>
                 <property name="hexpand">True</property>
                 <property name="vexpand">True</property>
+                <property name="position">132</property>
+                <property name="position_set">True</property>
                 <child>
                   <object class="GtkGrid" id="grd_contents">
                     <property name="visible">True</property>
@@ -986,6 +1005,7 @@
                                 <property name="can_focus">True</property>
                                 <property name="hexpand">True</property>
                                 <property name="vexpand">True</property>
+                                <property name="model">trfltr_contents</property>
                                 <property name="search_column">1</property>
                                 <property name="tooltip_column">2</property>
                                 <child internal-child="selection">
@@ -1048,12 +1068,11 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkGrid" id="grd_code">
+                  <object class="GtkPaned" id="pnd_code">
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="hexpand">True</property>
-                    <property name="vexpand">True</property>
-                    <property name="column_spacing">4</property>
+                    <property name="can_focus">True</property>
+                    <property name="position">264</property>
+                    <property name="position_set">True</property>
                     <child>
                       <object class="GtkGrid" id="grd_llvm">
                         <property name="visible">True</property>
@@ -1119,8 +1138,8 @@
                         </child>
                       </object>
                       <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">0</property>
+                        <property name="resize">False</property>
+                        <property name="shrink">False</property>
                       </packing>
                     </child>
                     <child>
@@ -1159,13 +1178,13 @@
                         </child>
                       </object>
                       <packing>
-                        <property name="left_attach">1</property>
-                        <property name="top_attach">0</property>
+                        <property name="resize">False</property>
+                        <property name="shrink">False</property>
                       </packing>
                     </child>
                   </object>
                   <packing>
-                    <property name="resize">True</property>
+                    <property name="resize">False</property>
                     <property name="shrink">False</property>
                   </packing>
                 </child>
@@ -1183,17 +1202,5 @@
         </child>
       </object>
     </child>
-  </object>
-  <object class="GtkTreeStore" id="trst_contents">
-    <columns>
-      <!-- column-name Object -->
-      <column type="GObject"/>
-      <!-- column-name Display -->
-      <column type="gchararray"/>
-      <!-- column-name Tooltip -->
-      <column type="gchararray"/>
-      <!-- column-name Style -->
-      <column type="PangoStyle"/>
-    </columns>
   </object>
 </interface>

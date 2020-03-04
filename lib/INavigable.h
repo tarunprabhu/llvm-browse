@@ -6,6 +6,7 @@
 
 #include <llvm/ADT/StringRef.h>
 
+#include "LLVMRange.h"
 #include "SourceRange.h"
 
 namespace lb {
@@ -41,13 +42,13 @@ protected:
   // that don't return a value, it may cover the instruction opcode although
   // it might be better if it is of length 0 and positioned just at the start
   // of the op code
-  SourceRange llvm_defn;
+  LLVMRange llvm_defn;
 
   // The LLVM range is the range in characters that the entity covers in
   // the IR. For functions, this is the entire body, for basic blocks, all
   // the characters from the start of the first instruction in the block to
   // the end of the last. It may be invalid for other entities
-  SourceRange llvm_range;
+  LLVMRange llvm_range;
 
   // The source defn is the range in characters in the source code that 
   // the definition of the entity covers. For functions and globals, this 
@@ -69,7 +70,7 @@ protected:
   // but it doesn't make sense to have any uses for them. But it's a bit messy
   // to separate the two and still keep the type system straight (or - and this
   // is more likely - I am being particuarly dense)
-  std::vector<SourceRange> m_uses;
+  std::vector<LLVMRange> m_uses;
 
 public:
   using Iterator = decltype(m_uses)::const_iterator;
@@ -89,10 +90,10 @@ public:
                bool may_need_quotes = true);
   
   void sort_uses();
-  void add_use(const SourceRange& range);
+  void add_use(const LLVMRange& range);
 
-  void set_llvm_defn(const SourceRange& range);
-  void set_llvm_range(const SourceRange& range);
+  void set_llvm_defn(const LLVMRange& range);
+  void set_llvm_range(const LLVMRange& range);
   void set_source_defn(const SourceRange& range);
   void set_source_range(const SourceRange& range);
 
@@ -100,14 +101,15 @@ public:
   Iterator end() const;
   llvm::iterator_range<Iterator> uses() const;
   unsigned get_num_uses() const;
+  const LLVMRange* get_uses_c() const;
   bool has_tag() const;
   llvm::StringRef get_tag() const;
   bool has_llvm_defn() const;
   bool has_llvm_range() const;
   bool has_source_defn() const;
   bool has_source_range() const;
-  const SourceRange& get_llvm_defn() const;
-  const SourceRange& get_llvm_range() const;
+  const LLVMRange& get_llvm_defn() const;
+  const LLVMRange& get_llvm_range() const;
   const SourceRange& get_source_defn() const;
   const SourceRange& get_source_range() const;
 };

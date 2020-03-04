@@ -291,9 +291,9 @@ Module::get_llvm() const {
 }
 
 bool
-Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
-  size_t begin          = range.begin;
-  size_t end            = range.end;
+Module::check_range(const LLVMRange& range, llvm::StringRef tag) const {
+  uint64_t begin          = range.begin;
+  uint64_t end            = range.end;
   llvm::StringRef slice = get_contents().substr(begin, end - begin);
   if(slice != tag)
     return false;
@@ -303,10 +303,10 @@ Module::check_range(const SourceRange& range, llvm::StringRef tag) const {
 bool
 Module::check_navigable(const INavigable& n) const {
   llvm::StringRef tag = n.get_tag();
-  if(const SourceRange& range = n.get_llvm_defn()) {
+  if(const LLVMRange& range = n.get_llvm_defn()) {
     if(not check_range(range, tag)) {
-      size_t begin = range.begin;
-      size_t end   = range.end;
+      uint64_t begin = range.begin;
+      uint64_t end   = range.end;
       critical() << "Definition mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << tag << endl
@@ -323,9 +323,9 @@ Module::check_navigable(const INavigable& n) const {
 
 bool
 Module::check_uses(const INavigable& n) const {
-  for(const SourceRange& use : n.uses()) {
+  for(const LLVMRange& use : n.uses()) {
     if(not check_range(use, n.get_tag())) {
-      size_t begin = use.begin;
+      uint64_t begin = use.begin;
       size_t end   = use.end;
 
       critical() << "Use mismatch" << endl

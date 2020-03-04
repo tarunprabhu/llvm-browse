@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
 import argparse
-from .clib import lb_module_create, lb_module_free
-from .module import Module
+# from .module import Module
 from .ui import UI
 from .options import Options
 from typing import Union, List
 import gi
-gi.require_version('GLib', '2.0')
-gi.require_version('GObject', '2.0')
-gi.require_version('Gtk', '3.0')
-gi.require_version('GtkSource', '4')
+gi.require_version('GLib', '${PY_GLIB_VERSION}')
+gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
+gi.require_version('Gtk', '${PY_GTK_VERSION}')
+gi.require_version('GtkSource', '${PY_GTKSOURCE_VERSION}')
 from gi.repository import GLib, GObject, Gtk, GtkSource  # NOQA: E402
 
 # Not sure why I need to register the GtkSourceView, but best to do it

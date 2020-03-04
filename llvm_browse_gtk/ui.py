@@ -1,24 +1,50 @@
 #!/usr/bin/env python3
 
-from .clib import lb_module_get_llvm
+import os
 import gi
-gi.require_version('Gtk', '3.0')
-gi.require_version('GObject', '2.0')
-gi.require_version('GtkSource', '4')
-from gi.repository import Gtk, GObject, GtkSource  # NOQA: E402
+gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
+gi.require_version('GLib', '${PY_GLIB_VERSION}')
+gi.require_version('Gdk', '${PY_GTK_VERSION}')
+gi.require_version('GdkPixbuf', '${PY_GDKPIXBUF_VERSION}')
+gi.require_version('Gio', '${PY_GIO_VERSION}')
+gi.require_version('Gtk', '${PY_GDK_VERSION}')
+gi.require_version('Pango', '${PY_PANGO_VERSION}')
+gi.require_version('GtkSource', '${PY_GTKSOURCE_VERSION}')
+from gi.repository import GObject, GLib, Gdk, GdkPixbuf, Gio, Gtk, GtkSource  # NOQA: E402
 
 
 class UI(GObject.GObject):
     def __init__(self, app):
         GObject.GObject.__init__(self)
 
-        # FIXME: Read the glade UI description from a resource file
-        self.builder = Gtk.Builder.new_from_file(
-            '/home/tarun/code/llvm-browse/resources/ui/llvm-browse.glade')
+        Gio.Resource.load(os.path.join(os.path.dirname(__file__),
+                                       'llvm-browse.gresource'))._register()
+
+        self.builder = Gtk.Builder.new_from_resource(
+            '/llvm-browse/gtk/llvm-browse.ui')
+        self.srcbuf_llvm = self['srcvw_llvm'].get_buffer()
+        self.srcbuf_code = self['srcvw_source'].get_buffer()
+        self.mgr_lang = GtkSource.LanguageManager.get_default()
+        self.mgr_style = GtkSource.StyleSchemeManager.get_default()
+        self.win_main = self['win_main']
+        self.pnd_body = self['pnd_body']
+        self.pnd_code = self['pnd_code']
+
+        icon16 = GdkPixbuf.Pixbuf.new_from_resource(
+            '/llvm-browse/icons/16x16/llvm-browse.svg')
+        icon64 = GdkPixbuf.Pixbuf.new_from_resource(
+            '/llvm-browse/icons/64x64/llvm-browse.svg')
+
+        self['win_main'].set_icon(icon16)
+        self['dlg_file'].set_icon(icon16)
+        self['dlg_options'].set_icon(icon16)
+        self['dlg_about'].set_icon(icon16)
+        self['dlg_about'].set_logo(icon64)
 
         self.app = app
         self.options: Options = self.app.options
 
+        self._init_widgets()
         self._bind_options()
         self._bind_widget_properties()
         self._bind_state_properties()
@@ -27,6 +53,9 @@ class UI(GObject.GObject):
 
     def __getitem__(self, name: str) -> GObject.GObject:
         return self.builder.get_object(name)
+
+    def _init_widgets(self):
+        self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
 
     def _bind(self,
               src: GObject,
@@ -92,6 +121,7 @@ class UI(GObject.GObject):
                        self['tlbtn_close'],
                        self['mitm_search_forward'],
                        self['mitm_search_backward'],
+                       self['mitm_goto_line'],
                        self['mitm_goto_definition'],
                        self['tlbtn_goto_definition'],
                        self['mitm_goto_prev_use'],
@@ -101,8 +131,8 @@ class UI(GObject.GObject):
                        self['mitm_go_back'],
                        self['tlbtn_go_back'],
                        self['mitm_go_forward'],
-                       self['tlbtn_go_back']):
-            bind('loaded', widget, 'sensitive')
+                       self['tlbtn_go_forward']):
+            bind('llvm', widget, 'sensitive')
 
     @GObject.Signal
     def launch(self, *args):
@@ -111,11 +141,40 @@ class UI(GObject.GObject):
             self['win_main'].maximize()
 
     def do_open(self):
-        print('do_open:', self.app.llvm)
-        self['srcvw_llvm'].get_buffer().set_text(
-            lb_module_get_llvm(self.app.llvm))
+        def get_style(artificial: bool) -> Pango.Style:
+            if artificial:
+                return Pango.Style.ITALIC
+            return Pango.Style.NORMAL
 
-    def on_open(self, *args) -> bool:
+        self.srcbuf_llvm.set_text(lb_module_get_llvm(self.app.llvm))
+
+        trvw = self['trvw_contents']
+        trfltr = trvw.get_model()
+        trst = self['trst_contents']
+        module = self.app.module
+
+        trvw.set_model(None)
+        trst.clear()
+        for label, entities in zip(
+            ['Aliases', 'Functions', 'Globals', 'Structs'],
+                [module.aliases, module.functions, module.globals,
+                 module.structs]):
+            trit = module.add(None, [0, label, '', Pango.Style.Normal])
+            for entity in entities:
+                module.add(trit,
+                           [entity,
+                            lb_entity_get_llvm_name(entity),
+                            lb_entity_get_source_name(entity),
+                            get_style(lb_entity_is_artificial(entity))])
+        trvw.get_model(trfltr)
+
+    def on_open_recent(self, widget: Gtk.Widget) -> bool:
+        file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
+        if file:
+            self.app.action_open(file)
+        return False
+
+    def on_open(self, widget: Gtk.Widget) -> bool:
         dlg = self['dlg_file']
         response = dlg.run()
         if response == Gtk.ResponseType.OK:
@@ -123,19 +182,18 @@ class UI(GObject.GObject):
             # UI by doing this here
             self.app.action_open(dlg.get_filename())
         dlg.hide()
-        return True
+        return False
 
     def on_close(self, *args) -> bool:
         self.app.action_close()
-        self['srcvw_llvm'].get_buffer().set_text('')
-        return True
+        self.srcbuf_llvm.set_text('')
+        return False
 
     def on_reload(self, *args) -> bool:
         # FIXME: Do this in a separate thread instead of blocking the UI
         # by doing this
         if self.app.action_reload():
-            self['srcvw_llvm'].get_buffer().set_text(
-                self.app.module.get_llvm())
+            self.do_open()
         return False
 
     def on_quit(self, *args) -> bool:
@@ -155,7 +213,7 @@ class UI(GObject.GObject):
         dlg = self['dlg_about']
         dlg.run()
         dlg.hide()
-        return True
+        return False
 
     def on_goto_line(self, *args) -> bool:
         return False
@@ -188,4 +246,4 @@ class UI(GObject.GObject):
         return False
 
     def get_application_window(self) -> Gtk.ApplicationWindow:
-        return self['win_main']
+        return self.win_main

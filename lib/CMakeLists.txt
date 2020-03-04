@@ -8,15 +8,13 @@ set(SOURCES
   MDNode.cpp
   Module.cpp
   INavigable.cpp
+  LLVMRange.cpp
   Logging.cpp
-  LLVMBrowse.cpp
   Parser.cpp
   SourceRange.cpp
   String.cpp
   StructType.cpp
   Value.cpp)
-
-set(LIB_SYMLINK ${PROJECT_SOURCE_DIR}/llvm_browse/lib${LIB_LLVM_BROWSE_LIB}.so)
 
 add_library(${LIB_LLVM_BROWSE_LIB} SHARED
   ${SOURCES})

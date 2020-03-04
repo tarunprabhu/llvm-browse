@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "Errors.h"
+#include "LLVMRange.h"
 #include "MDNode.h"
 #include "Parser.h"
 #include "StructType.h"
@@ -102,7 +103,7 @@ protected:
   MDNode& get(const llvm::MDNode& llvm);
   Value& get(const llvm::Value& llvm);
 
-  bool check_range(const SourceRange& range, llvm::StringRef tag) const;
+  bool check_range(const LLVMRange& range, llvm::StringRef tag) const;
   bool check_uses(const INavigable& navigable) const;
   bool check_navigable(const INavigable& navigable) const;
 

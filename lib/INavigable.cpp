@@ -15,13 +15,13 @@ void
 INavigable::sort_uses() {
   std::sort(m_uses.begin(),
             m_uses.end(),
-            [](const SourceRange& l, const SourceRange& r) {
+            [](const LLVMRange& l, const LLVMRange& r) {
               return ((l.begin < r.begin) and (l.end < r.end));
             });
 }
 
 void
-INavigable::add_use(const SourceRange& range) {
+INavigable::add_use(const LLVMRange& range) {
   m_uses.emplace_back(range);
 }
 
@@ -46,12 +46,12 @@ INavigable::set_tag(llvm::StringRef name,
 }
 
 void
-INavigable::set_llvm_defn(const SourceRange& range) {
+INavigable::set_llvm_defn(const LLVMRange& range) {
   llvm_defn = range;
 }
 
 void
-INavigable::set_llvm_range(const SourceRange& range) {
+INavigable::set_llvm_range(const LLVMRange& range) {
   llvm_range = range;
 }
 
@@ -95,6 +95,10 @@ INavigable::get_num_uses() const {
   return m_uses.size();
 }
 
+const LLVMRange* INavigable::get_uses_c() const {
+  return m_uses.data();
+}
+
 bool INavigable::has_llvm_defn() const {
   return llvm_defn;
 }
@@ -111,12 +115,12 @@ bool INavigable::has_source_range() const {
   return source_range;
 }
 
-const SourceRange&
+const LLVMRange&
 INavigable::get_llvm_defn() const {
   return llvm_defn;
 }
 
-const SourceRange&
+const LLVMRange&
 INavigable::get_llvm_range() const {
   return llvm_range;
 }

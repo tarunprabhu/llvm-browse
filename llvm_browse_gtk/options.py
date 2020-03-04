@@ -4,18 +4,18 @@ from os import makedirs, path
 from sys import stderr
 from typing import List
 import gi
-gi.require_version('GLib', '2.0')
-gi.require_version('GObject', '2.0')
-gi.require_version('Gtk', '3.0')
-gi.require_version('GtkSource', '4')
-gi.require_version('Pango', '1.0')
+gi.require_version('GLib', '${PY_GLIB_VERSION}')
+gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
+gi.require_version('Gtk', '${PY_GTK_VERSION}')
+gi.require_version('GtkSource', '${PY_GTKSOURCE_VERSION}')
+gi.require_version('Pango', '${PY_PANGO_VERSION}')
 from gi.repository import GLib, GObject, Gtk, GtkSource, Pango  # NOQA: E402
 
 
 class Options(GObject.GObject):
     font = GObject.Property(
         type=Pango.FontDescription,
-        default=Pango.FontDescription.from_string('Monospace'),
+        default=Pango.FontDescription.from_string('Monospace 10'),
         nick='font',
         blurb='Font to use in the source views')
 

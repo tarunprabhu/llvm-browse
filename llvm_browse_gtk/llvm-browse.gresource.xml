@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <gresources>
   <gresource prefix="/llvm-browse">
-    <file preprocess="xml-stripblanks" compressed="true">ui/llvm-browse.glade</file>
+    <file preprocess="xml-stripblanks" compressed="true" alias="gtk/llvm-browse.ui">llvm_browse_gtk/llvm-browse.glade</file>
     <file>icons/16x16/llvm-browse.svg</file>
     <file>icons/24x24/llvm-browse.svg</file>
     <file>icons/32x32/llvm-browse.svg</file>

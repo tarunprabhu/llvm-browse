@@ -2,14 +2,14 @@
 
 from collections import namedtuple
 
-SourceRange = namedtuple('SourceRange', ['line', 'column'])
+SourcePoint = namedtuple('SourceRange', ['line', 'column'])
 
 # SourceLoc represents a location in the source file
 #   file: full path to the source file
 #   line: Line number
 #   column: Column number
 #
-SourceLoc = namedtuple('SourceLoc',
+SourceRange = namedtuple('SourceRange',
                        [
                            'file',
                            'begin',
@@ -20,4 +20,4 @@ SourceLoc = namedtuple('SourceLoc',
 # It is actually a range and represents the range in the LLVM file that an
 # entity spans
 #
-LLVMLoc = namedtuple('LLVMLoc', ['begin', 'end'])
+LLVMRange = namedtuple('LLVMRange', ['begin', 'end'])

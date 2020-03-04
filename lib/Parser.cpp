@@ -253,7 +253,7 @@ Parser::associate_values(std::vector<INavigable*> values, size_t cursor) {
     while(overlaps(pos, mapped))
       pos = find(tag, pos + 1, Lookback::Whitespace, false);
     mapped[v] = pos;
-    v->add_use(SourceRange(pos, pos + v->get_tag().size()));
+    v->add_use(LLVMRange(pos, pos + v->get_tag().size()));
   }
 
   return mapped;
@@ -315,7 +315,7 @@ Parser::link(Module& module) {
     if(llvm_sty->hasName()) {
       StructType& sty = module.add(llvm_sty);
       size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
-      sty.set_llvm_defn(SourceRange(pos, pos + sty.get_tag().size()));
+      sty.set_llvm_defn(LLVMRange(pos, pos + sty.get_tag().size()));
     } else {
       warning() << "Skipping unnamed struct type: " << llvm_sty << "\n";
     }
@@ -333,7 +333,7 @@ Parser::link(Module& module) {
         critical() << "Could not find global definition: " << g.get_tag()
                    << "\n";
       else
-        g.set_llvm_defn(SourceRange(pos, pos + g.get_tag().size()));
+        g.set_llvm_defn(LLVMRange(pos, pos + g.get_tag().size()));
 
       // FIXME: Skipping any metadata on global variables because I can't
       // figure out how to get just the non-debug 
@@ -351,7 +351,7 @@ Parser::link(Module& module) {
     if(pos == llvm::StringRef::npos)
       critical() << "Could not find alias definition: " << a.get_tag() << "\n";
     else
-      a.set_llvm_defn(SourceRange(pos, pos + a.get_tag().size()));
+      a.set_llvm_defn(LLVMRange(pos, pos + a.get_tag().size()));
   }
 
   // Do this in two passes because there may be circular references
@@ -364,7 +364,7 @@ Parser::link(Module& module) {
       critical() << "Could not find function definition: " << f.get_tag()
                  << "\n";
     else
-      f.set_llvm_defn(SourceRange(pos, pos + f.get_tag().size()));
+      f.set_llvm_defn(LLVMRange(pos, pos + f.get_tag().size()));
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
   }
@@ -379,7 +379,7 @@ Parser::link(Module& module) {
       critical() << "Could not find metadata definition: " << md.get_tag()
                  << "\n";
     else
-      md.set_llvm_defn(SourceRange(pos, pos + md.get_tag().size()));
+      md.set_llvm_defn(LLVMRange(pos, pos + md.get_tag().size()));
   }
 
   message() << "Processing global variables\n";
@@ -464,9 +464,9 @@ Parser::link(Module& module) {
 
         size_t i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
         if(llvm_inst.getType()->isVoidTy())
-          inst.set_llvm_defn(SourceRange(i_begin, i_begin));
+          inst.set_llvm_defn(LLVMRange(i_begin, i_begin));
         else
-          inst.set_llvm_defn(SourceRange(i_begin, i_begin + tag.size()));
+          inst.set_llvm_defn(LLVMRange(i_begin, i_begin + tag.size()));
 
         // Because we don't want to even try to parse the instruction operands,
         // everything will have to be text-based matching. To reduce the
@@ -525,7 +525,7 @@ Parser::link(Module& module) {
       // instruction
       size_t bb_begin
           = module.get(llvm_bb.front()).get_llvm_defn().begin;
-      bb.set_llvm_range(SourceRange(bb_begin, bb_begin));
+      bb.set_llvm_range(LLVMRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular
@@ -548,12 +548,12 @@ Parser::link(Module& module) {
       }
 
       if(bb_end != llvm::StringRef::npos)
-        bb.set_llvm_range(SourceRange(bb_begin, bb_end));
+        bb.set_llvm_range(LLVMRange(bb_begin, bb_end));
     }
 
     size_t f_end = module.get(llvm_f.back()).get_llvm_defn().end;
     if(f_end != llvm::StringRef::npos)
-      f.set_llvm_range(SourceRange(f_begin, f_end + 1));
+      f.set_llvm_range(LLVMRange(f_begin, f_end + 1));
   }
 
   message() << "Processing metadata\n";
@@ -599,7 +599,7 @@ Parser::link(Module& module) {
           ss << "}";
         size_t pos = find_and_move(ss.str(), Lookback::Any, cursor);
         if(pos != llvm::StringRef::npos)
-          op.add_use(SourceRange(pos, pos + op.get_tag().size()));
+          op.add_use(LLVMRange(pos, pos + op.get_tag().size()));
         else
           warning() << "Could not find metadata operand: " << op.get_tag()
                     << "\n";
