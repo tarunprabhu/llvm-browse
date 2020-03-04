@@ -192,7 +192,7 @@ message(STATUS "Glib resources compiler: ${GLIB_COMPILE_RESOURCES}")
 # Default cmake flags
 set(CMAKE_SKIP_BUILD_RPATH False)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH False)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH False)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
 set(CMAKE_INSTALL_RPATH ${PROJECT_INSTALL_LIB_DIR}/llvm_browse)
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC)
