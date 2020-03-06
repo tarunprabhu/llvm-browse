@@ -48,10 +48,10 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
   std::unique_ptr<llvm::Module> module;
   std::unique_ptr<llvm::MemoryBuffer> out;
   llvm::SMDiagnostic error;
-  if(module = llvm::parseAssembly(in->getMemBufferRef(),
-                                  error,
-                                  context,
-                                  global_slots.get())) {
+  if((module = llvm::parseAssembly(in->getMemBufferRef(),
+                                   error,
+                                   context,
+                                   global_slots.get()))) {
     out = std::move(in);
     ir  = out->getBuffer();
   } else {

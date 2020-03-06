@@ -6,9 +6,7 @@
 namespace lb {
 
 // Empty new line type used to align the output stream
-struct NewLineT {
-	;
-};
+struct NewLineT {};
 
 // Not really a "type", but it only gets applied to type definitions
 // The alignemnt guarantees that the lower-order bits of the

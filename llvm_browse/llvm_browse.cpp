@@ -656,7 +656,7 @@ static struct PyModuleDef module_def = {
     nullptr,
 };
 
-extern "C" PyMODINIT_FUNC
+PyMODINIT_FUNC
 PyInit_llvm_browse(void) {
   // Initialize types
   PySourcePoint = PyStructSequence_NewType(&PySourcePointDesc);
