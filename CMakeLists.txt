@@ -139,20 +139,25 @@ endif()
 # just in case
 
 function(check_python_bindings BINDING_NAME BINDING_VERSION)
-  message(STATUS "Checking for Python bindings ${BINDING_NAME} ${BINDING_VERSION}")
-  execute_process(COMMAND
-    ${Python_EXECUTABLE} -c "import gi; gi.require_version('${BINDING_NAME}', '${BINDING_VERSION}')"
-    OUTPUT_QUIET
-    ERROR_VARIABLE STDERR)
-  if(STDERR)
-    message(FATAL_ERROR "Missing required Python bindings: ${BINDING_NAME} ${BINDING_VERSION}\n${STDERR}")
-  else()
-    message(STATUS "  Found '${BINDING_NAME}' '${BINDING_VERSION}'")
-    # Set a variable in the parent scope so CMake doesn't run these checks 
-    # every time make is called
-    set(Py${BINDING_NAME}_FOUND 1 PARENT_SCOPE)
+  # Do not run check if a cache variable was found, typically on a previous
+  # invocation of cmake. There might be a better way of doing this that is 
+  # not manual
+  if(NOT Py${BINDING_NAME}_FOUND)
+    message(STATUS "Checking for Python bindings ${BINDING_NAME} ${BINDING_VERSION}")
+    execute_process(COMMAND
+      ${Python_EXECUTABLE} -c "import gi; gi.require_version('${BINDING_NAME}', '${BINDING_VERSION}')"
+      OUTPUT_QUIET
+      ERROR_VARIABLE STDERR)
+    if(STDERR)
+      message(FATAL_ERROR "Missing required Python bindings: ${BINDING_NAME} ${BINDING_VERSION}\n${STDERR}")
+    else()
+      message(STATUS "  Found '${BINDING_NAME}' '${BINDING_VERSION}'")
+      # Set a variable in the parent scope so CMake doesn't run these checks 
+      # every time make is called
+      set(Py${BINDING_NAME}_FOUND YES CACHE BOOL "Found Python binding for ${BINDING_NAME} ${BINDING_VERSION}")
+    endif()
   endif()
-endfunction() 
+endfunction(check_python_bindings)
 
 # Check if gi python module is installed
 execute_process(COMMAND
