@@ -13,9 +13,10 @@ gi.require_version('GdkPixbuf', '${PY_GDKPIXBUF_VERSION}')
 gi.require_version('Gio', '${PY_GIO_VERSION}')
 gi.require_version('Gtk', '${PY_GDK_VERSION}')
 gi.require_version('Pango', '${PY_PANGO_VERSION}')
+gi.require_version('PangoCairo', '${PY_PANGOCAIRO_VERSION}')
 gi.require_version('GtkSource', '${PY_GTKSOURCE_VERSION}')
 from gi.repository import (GObject, GLib, Gdk, GdkPixbuf,
-                           Gio, Gtk, GtkSource, Pango)  # NOQA: E402
+                           Gio, Gtk, GtkSource, Pango, PangoCairo)  # NOQA: E402
 
 
 class ModelColsContents(IntEnum):
@@ -23,9 +24,21 @@ class ModelColsContents(IntEnum):
     Display = 1
     Tooltip = 2
     Style = 3
+    Weight = 4
+    Font = 5
 
 
 class UI(GObject.GObject):
+    @staticmethod
+    def fn_font_filter(family, face) -> bool:
+        # If the SelectionLevel in Glade doesn't include STYLE, then some
+        # font variants are missing in the FontChooser widget. For example,
+        # you see Liberation Mono Bold, but not Liberation Mono Regular.
+        # Not really sure what's up with that but including the styles
+        # gets you everything including *all* the variants. So we now have
+        # to filter out all the non-regular stuff. Quite silly, really!
+        return face.get_face_name() == 'Regular'
+
     def __init__(self, app):
         GObject.GObject.__init__(self)
 
@@ -75,6 +88,7 @@ class UI(GObject.GObject):
     def _init_widgets(self):
         self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
         self.trsrt_contents.set_sort_func(1, self.fn_contents_sort_names)
+        self['fbtn_options_code'].set_filter_func(UI.fn_font_filter)
 
     def _bind(self,
               src: GObject,
@@ -116,6 +130,8 @@ class UI(GObject.GObject):
         bind('show-contents', self['swch_options_contents'], 'active')
         bind('show-source', self['grd_source'], 'visible', bidirectional=False)
         bind('show-source', self['swch_options_source'], 'active')
+
+        self.options.connect('notify::font', self.on_font_changed)
 
     def _bind_widget_properties(self):
         self._bind(self['mitm_view_contents'], 'active',
@@ -184,6 +200,21 @@ class UI(GObject.GObject):
 
         GLib.idle_add(impl, *args, priority=GLib.PRIORITY_DEFAULT_IDLE)
 
+    def on_font_changed(self, *args):
+        font = self.options.font
+        css = ['textview {']
+        css.append('font-family: {};'.format(font.get_family()))
+        css.append('font-size: {}pt;'.format(font.get_size() / Pango.SCALE))
+        css.append('}')
+        provider = Gtk.CssProvider.get_default()
+        provider.load_from_data('\n'.join(css).encode('utf-8'))
+        for widget in (self.srcvw_llvm,
+                       self.srcvw_code):
+            style = widget.get_style_context()
+            style.add_provider(
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
     def do_open(self):
         def get_style(entity: Entity) -> Pango.Style:
             if entity.artificial:
@@ -194,9 +225,9 @@ class UI(GObject.GObject):
             if (not entity.source_name) and (not entity.full_name):
                 return ''
 
-            # TODO: Use the same font as the rest of the code
             out = []
-            out.append('<tt>')
+            out.append('<span font_desc="{}">'.format(
+                self.options.font.to_string()))
             if entity.source_name:
                 out.append('<b>{:7}</b> {}'.format(
                     'Source',
@@ -209,7 +240,7 @@ class UI(GObject.GObject):
                 out.append('\n<b>{:7}</b> {}'.format(
                     'Full',
                     GLib.markup_escape_text(entity.full_name)))
-            out.append('</tt>')
+            out.append('</span>')
 
             return ''.join(out)
 
@@ -224,15 +255,20 @@ class UI(GObject.GObject):
                                 ('Structs', module.structs)]:
             trit = self.trst_contents.append(None,
                                              [None,
-                                              label, 
-                                              '', 
-                                              Pango.Style.NORMAL])
+                                              label,
+                                              '',
+                                              Pango.Style.NORMAL,
+                                              Pango.Weight.BOLD,
+                                              ''])
+            font = self.options.font.get_family()
             for entity in entities:
                 self.trst_contents.append(trit,
                                           [entity,
                                            entity.llvm_name,
                                            get_tooltip(entity),
-                                           get_style(entity)])
+                                           get_style(entity),
+                                           Pango.Weight.NORMAL,
+                                           font])
         self.trvw_contents.set_model(self.trsrt_contents)
 
     def on_open_recent(self, widget: Gtk.Widget) -> bool:

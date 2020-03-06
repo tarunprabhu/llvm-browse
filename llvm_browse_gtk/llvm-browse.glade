@@ -174,7 +174,6 @@
                                 <property name="receives_default">True</property>
                                 <property name="font">Sans 12</property>
                                 <property name="language">en-us</property>
-                                <property name="level">GTK_FONT_CHOOSER_LEVEL_SIZE | GTK_FONT_CHOOSER_LEVEL_FAMILY</property>
                                 <property name="preview_text">declare void @func (i32)</property>
                                 <property name="title" translatable="yes">Code font</property>
                                 <property name="show_style">False</property>
@@ -475,6 +474,10 @@
       <column type="gchararray"/>
       <!-- column-name Style -->
       <column type="PangoStyle"/>
+      <!-- column-name Weight -->
+      <column type="gint"/>
+      <!-- column-name Font -->
+      <column type="gchararray"/>
     </columns>
   </object>
   <object class="GtkTreeModelFilter" id="trfltr_contents">
@@ -1033,8 +1036,10 @@
                                     <child>
                                       <object class="GtkCellRendererText" id="rndr_display"/>
                                       <attributes>
+                                        <attribute name="family">5</attribute>
                                         <attribute name="style">3</attribute>
                                         <attribute name="text">1</attribute>
+                                        <attribute name="weight">4</attribute>
                                       </attributes>
                                     </child>
                                   </object>
