@@ -88,6 +88,7 @@ class UI(GObject.GObject):
     def _init_widgets(self):
         self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
         self.trsrt_contents.set_sort_func(1, self.fn_contents_sort_names)
+        self.trfltr_contents.set_visible_func(self.fn_contents_filter_names)
         self['fbtn_options_code'].set_filter_func(UI.fn_font_filter)
 
     def _bind(self,
@@ -187,6 +188,20 @@ class UI(GObject.GObject):
                 return 1
         return 0
 
+    def fn_contents_filter_names(self,
+                                 model: Gtk.TreeModel,
+                                 i: Gtk.TreeIter,
+                                 data: object) -> bool:
+        if not model[i][ModelColsContents.Entity]:
+            return True
+
+        srch = self['srch_contents'].get_text()
+        if not srch:
+            return True
+
+        name = model[i][ModelColsContents.Display]
+        return srch in name
+
     @GObject.Signal
     def launch(self, *args):
         self['win_main'].show()
@@ -271,6 +286,24 @@ class UI(GObject.GObject):
                                            font])
         self.trvw_contents.set_model(self.trsrt_contents)
 
+    def do_entity_select(self, entity: Entity):
+        def update_ui(i: Gtk.TreeIter) -> bool:
+            self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
+            return False
+
+        offset = entity.llvm_defn.begin
+        off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
+        line = off_iter.get_line()
+        line_iter = self.srcbuf_llvm.get_iter_at_line(line)
+        self.srcbuf_llvm.place_cursor(line_iter)
+        self.do_async(update_ui, line_iter)
+
+    def do_toggle_expand_row(self, path: Gtk.TreePath):
+        if self.trvw_contents.row_expanded(path):
+            self.trvw_contents.collapse_row(path)
+        else:
+            self.trvw_contents.expand_row(path, True)
+
     def on_open_recent(self, widget: Gtk.Widget) -> bool:
         file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
         if file:
@@ -318,6 +351,43 @@ class UI(GObject.GObject):
         dlg.hide()
         return False
 
+    def on_contents_search_start(self, *args) -> bool:
+        srchbar = self['srchbar_contents']
+        if not srchbar.get_search_mode():
+            self['srchbar_contents'].set_search_mode(True)
+        else:
+            self['srch_contents'].grab_focus()
+        return False
+
+    def on_contents_search_changed(self,
+                                   srch: Gtk.SearchEntry) -> bool:
+        self.trfltr_contents.refilter()
+        return False
+
+    def on_contents_search_focus_out(self, *args) -> bool:
+        # If we tab out from the search entry, set the focus to the contents
+        # view because that is almost certainly what we want
+        self.trvw_contents.grab_focus()
+        return False
+
+    def on_contents_key_release(self,
+                                trvw: Gtk.TreeView,
+                                evt: Gdk.EventKey) -> bool:
+        keys = set([Gdk.KEY_Return,
+                    Gdk.KEY_KP_Enter,
+                    Gdk.KEY_ISO_Enter])
+        if evt.keyval in keys:
+            model, i = self['trsel_contents'].get_selected()
+            if i:
+                path = model.get_path(i)
+                entity = model[i][ModelColsContents.Entity]
+                if entity:
+                    self.do_entity_select(entity)
+        elif evt.keyval == Gdk.KEY_Escape:
+            if self['srchbar_contents'].get_search_mode():
+                self['srchbar_contents'].set_search_mode(False)
+        return False
+
     def on_contents_toggle_expand_all(self,
                                       tvcol: Gtk.TreeViewColumn) -> bool:
         if tvcol.get_title() == '+':
@@ -328,26 +398,16 @@ class UI(GObject.GObject):
             tvcol.set_title('+')
         return False
 
-    def on_entity_selected(self,
-                           trvw: Gtk.TreeView,
-                           path: Gtk.TreePath,
-                           col: Gtk.TreeViewColumn) -> bool:
-        def update_ui(i: Gtk.TreeIter) -> bool:
-            self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
-            return False
-
+    def on_contents_activated(self,
+                              trvw: Gtk.TreeView,
+                              path: Gtk.TreePath,
+                              col: Gtk.TreeViewColumn) -> bool:
         model = trvw.get_model()
-        row = model.get_iter(path)
-        entity = model[row][ModelColsContents.Entity]
+        entity = model[model.get_iter(path)][ModelColsContents.Entity]
         if entity:
-            offset = entity.llvm_defn.begin
-            off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
-            line = off_iter.get_line()
-            line_iter = self.srcbuf_llvm.get_iter_at_line(line)
-            self.srcbuf_llvm.place_cursor(line_iter)
-            self.do_async(update_ui, line_iter)
-
-        return False
+            self.do_entity_select(entity)
+        else:
+            self.do_toggle_expand_row(path)
 
     def on_goto_line(self, *args) -> bool:
         return False

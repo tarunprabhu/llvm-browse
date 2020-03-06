@@ -672,6 +672,17 @@
                       </object>
                     </child>
                     <child>
+                      <object class="GtkMenuItem" id="mitm_search_contents">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Search the contents bar</property>
+                        <property name="label" translatable="yes">Search _contents</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_contents_search_start" swapped="no"/>
+                        <accelerator key="f" signal="activate" modifiers="GDK_CONTROL_MASK | GDK_MOD1_MASK"/>
+                      </object>
+                    </child>
+                    <child>
                       <object class="GtkMenuItem" id="mitm_goto_line">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -1012,9 +1023,12 @@
                                 <property name="hexpand">True</property>
                                 <property name="vexpand">True</property>
                                 <property name="model">trsrt_contents</property>
+                                <property name="enable_search">False</property>
                                 <property name="search_column">1</property>
                                 <property name="tooltip_column">2</property>
-                                <signal name="row-activated" handler="on_entity_selected" swapped="no"/>
+                                <signal name="key-release-event" handler="on_contents_key_release" swapped="no"/>
+                                <signal name="row-activated" handler="on_contents_activated" swapped="no"/>
+                                <signal name="start-interactive-search" handler="on_contents_search_start" object="srchbar_contents" swapped="no"/>
                                 <child internal-child="selection">
                                   <object class="GtkTreeSelection" id="trsel_contents"/>
                                 </child>
@@ -1052,19 +1066,23 @@
                           </packing>
                         </child>
                         <child type="overlay">
-                          <object class="GtkSearchBar" id="srchbar_toolbar">
+                          <object class="GtkSearchBar" id="srchbar_contents">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="halign">end</property>
+                            <property name="halign">start</property>
                             <property name="valign">start</property>
+                            <property name="show_close_button">True</property>
                             <child>
-                              <object class="GtkSearchEntry" id="srch_toolbar">
+                              <object class="GtkSearchEntry" id="srch_contents">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="caps_lock_warning">False</property>
                                 <property name="primary_icon_name">edit-find-symbolic</property>
                                 <property name="primary_icon_activatable">False</property>
                                 <property name="primary_icon_sensitive">False</property>
+                                <signal name="activate" handler="on_contents_search_focus_out" swapped="no"/>
+                                <signal name="focus-out-event" handler="on_contents_search_focus_out" swapped="no"/>
+                                <signal name="search-changed" handler="on_contents_search_changed" swapped="no"/>
                               </object>
                             </child>
                           </object>
