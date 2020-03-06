@@ -138,45 +138,89 @@ endif()
 # case but I'm not sure. Probably should find another way of doing this
 # just in case
 
+function(check_python_bindings BINDING_NAME BINDING_VERSION)
+  message(STATUS "Checking for Python bindings ${BINDING_NAME} ${BINDING_VERSION}")
+  execute_process(COMMAND
+    ${Python_EXECUTABLE} -c "import gi; gi.require_version('${BINDING_NAME}', '${BINDING_VERSION}')"
+    OUTPUT_QUIET
+    ERROR_VARIABLE STDERR)
+  if(STDERR)
+    message(FATAL_ERROR "Missing required Python bindings: ${BINDING_NAME} ${BINDING_VERSION}\n${STDERR}")
+  else()
+    message(STATUS "  Found '${BINDING_NAME}' '${BINDING_VERSION}'")
+  endif()
+endfunction() 
+
+# Check if gi python module is installed
+execute_process(COMMAND
+    ${Python_EXECUTABLE} -c "import gi"
+    OUTPUT_QUIET
+    ERROR_VARIABLE PY_GI_ERROR)
+if(PY_GI_ERROR)
+  message(FATAL_ERROR "Missing required python module: gi")
+endif()
+
 # GObject
 set(PY_GOBJECT_VERSION 2.0)
-set(GOBJECT_PACKAGE gobject-${PY_GOBJECT_VERSION}>=2.52)
+set(GOBJECT_PACKAGE_MINIMUM 2.52)
+set(GOBJECT_PACKAGE gobject-${PY_GOBJECT_VERSION}>=${GOBJECT_PACKAGE_MINIMUM})
 pkg_check_modules(GOBJECT_REQUIRED ${GOBJECT_PACKAGE})
+check_python_bindings(GObject ${PY_GOBJECT_VERSION})
 
 # GLib
 set(PY_GLIB_VERSION 2.0)
-set(GLIB_PACKAGE glib-${PY_GLIB_VERSION}>=2.48)
+set(GLIB_PACKAGE_MINIMUM 2.48)
+set(GLIB_PACKAGE glib-${PY_GLIB_VERSION}>=${GLIB_PACKAGE_MINIMUM})
 pkg_check_modules(GLIB REQUIRED ${GLIB_PACKAGE})
-
-# GTK+
-set(PY_GTK_VERSION 3.0)
-set(GTK_PACKAGE gtk+-${PY_GTK_VERSION}>=3.20)
-pkg_check_modules(GTK REQUIRED ${GTK_PACKAGE})
-
-# GDK
-set(PY_GDK_VERSION 3.0)
-set(GDK_PACKAGE gdk-${PY_GDK_VERSION}>=3.20)
-pkg_check_modules(GDK REQUIRED ${GDK_PACKAGE})
-
-# GTKSource
-set(PY_GTKSOURCE_VERSION 4)
-set(GTKSOURCE_PACKAGE gtksourceview-${PY_GTKSOURCE_VERSION}>=4)
-pkg_check_modules(GTK_SOURCE REQUIRED ${GTKSOURCE_PACKAGE})
-
-# Pango
-set(PY_PANGO_VERSION 1.0)
-set(PANGO_PACKAGE pango)
-pkg_check_modules(PANGO REQUIRED ${PANGO_PACKAGE}>=1.40)
-
-# GdkPixbuf
-set(PY_GDKPIXBUF_VERSION 2.0)
-set(GDKPIXBUF_PACKAGE gdk-pixbuf-${PY_GDKPIXBUF_VERSION})
-pkg_check_modules(GDK_PIXBUF REQUIRED ${GDKPIXBUF_PACKAGE})
+check_python_bindings(GLib ${PY_GLIB_VERSION})
 
 # GIO
 set(PY_GIO_VERSION 2.0)
 set(GIO_PACKAGE gio-${PY_GIO_VERSION})
-pkg_check_modules(GIO REQUIRED ${GIO_PACKAGE}>=2.48)
+pkg_check_modules(GIO REQUIRED ${GIO_PACKAGE}>=${GLIB_PACKAGE_MINIMUM})
+check_python_bindings(Gio ${PY_GIO_VERSION})
+
+# GTK+
+set(PY_GTK_VERSION 3.0)
+set(GTK_PACKAGE_MINIMUM 3.20)
+set(GTK_PACKAGE gtk+-${PY_GTK_VERSION}>=${GTK_PACKAGE_MINIMUM})
+pkg_check_modules(GTK REQUIRED ${GTK_PACKAGE})
+check_python_bindings(Gtk ${PY_GTK_VERSION})
+
+# GDK
+set(PY_GDK_VERSION 3.0)
+set(GDK_PACKAGE gdk-${PY_GDK_VERSION}>=${GTK_PACKAGE_MINIMUM})
+pkg_check_modules(GDK REQUIRED ${GDK_PACKAGE})
+check_python_bindings(Gdk ${PY_GDK_VERSION})
+
+# GdkPixbuf
+set(PY_GDKPIXBUF_VERSION 2.0)
+set(GDKPIXBUF_PACKAGE_MINIMUM 2.36)
+set(GDKPIXBUF_PACKAGE gdk-pixbuf-${PY_GDKPIXBUF_VERSION}>=${GDKPIXBUF_PACKAGE_MINIMUM}})
+pkg_check_modules(GDK_PIXBUF REQUIRED ${GDKPIXBUF_PACKAGE})
+check_python_bindings(GdkPixbuf ${PY_GDKPIXBUF_VERSION})
+
+# GTKSource
+set(PY_GTKSOURCE_VERSION 4)
+set(GTKSOURCE_PACKAGE_MINIMUM)
+set(GTKSOURCE_PACKAGE gtksourceview-${PY_GTKSOURCE_VERSION}>=${GTKSOURCE_PACKAGE_MINIMUM}})
+pkg_check_modules(GTK_SOURCE REQUIRED ${GTKSOURCE_PACKAGE})
+check_python_bindings(GtkSource ${PY_GTKSOURCE_VERSION})
+
+# Pango
+set(PY_PANGO_VERSION 1.0)
+set(PANGO_PACKAGE_MINIMUM 1.40)
+set(PANGO_PACKAGE pango)
+pkg_check_modules(PANGO REQUIRED ${PANGO_PACKAGE}>=${PANGO_PACKAGE_MINIMUM})
+check_python_bindings(Pango ${PY_PANGO_VERSION})
+
+# PangoCairo
+set(PY_PANGOCAIRO_VERSION 1.0)
+set(PANGO_PACKAGE pangocairo)
+pkg_check_modules(PANGO_CAIRO REQUIRED ${PANGO_PACKAGE}>=${PANGO_PACKAGE_MINIMUM})
+check_python_bindings(PangoCairo ${PY_PANGOCAIRO_VERSION})
+
+# glib_compile_resources
 pkg_get_variable(GLIB_COMPILE_RESOURCES ${GIO_PACKAGE} glib_compile_resources)
 message(STATUS "Glib resources compiler: ${GLIB_COMPILE_RESOURCES}")
 
@@ -193,9 +237,9 @@ file(WRITE ${PROJECT_BINARY_DIR}/tmp/uninstall.sh "
 #!/bin/sh
 
 if [ -f ${PROJECT_BINARY_DIR}/install_manifest.txt ]; then
-  cat ${PROJECT_BINARY_DIR}/install_manifest.txt | xargs -L 1 rm --verbose
+  cat ${PROJECT_BINARY_DIR}/install_manifest.txt | xargs -L 1 rm --force --verbose
   for module in ${PYTHON_MODULES}; do
-    rmdir --verbose ${Python_INSTALL_FULL_SITEDIR}/$module
+    rm --recursive --force --verbose ${Python_INSTALL_FULL_SITEDIR}/$module
   done
 else
   echo 'Nothing to uninstall'
@@ -210,9 +254,9 @@ file(REMOVE_RECURSE ${PROJECT_BINARY_DIR}/tmp)
 set(CMAKE_SKIP_BUILD_RPATH False)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH False)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
-set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR};${LLVM_LIBRARY_DIR})
 
-add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC)
+add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter -fPIC)
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-std=c++14>)
 add_definitions(${LLVM_DEFINITIONS})
