@@ -3,6 +3,7 @@
 from .entity import Entity
 from enum import IntEnum
 import llvm_browse as lb
+import operator
 import os
 import gi
 gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
@@ -42,6 +43,10 @@ class UI(GObject.GObject):
         self.win_main = self['win_main']
         self.pnd_body = self['pnd_body']
         self.pnd_code = self['pnd_code']
+        self.trvw_contents = self['trvw_contents']
+        self.trst_contents = self['trst_contents']
+        self.trfltr_contents = self['trfltr_contents']
+        self.trsrt_contents = self['trsrt_contents']
 
         icon16 = GdkPixbuf.Pixbuf.new_from_resource(
             '/llvm-browse/icons/16x16/llvm-browse.svg')
@@ -69,6 +74,7 @@ class UI(GObject.GObject):
 
     def _init_widgets(self):
         self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
+        self.trsrt_contents.set_sort_func(1, self.fn_contents_sort_names)
 
     def _bind(self,
               src: GObject,
@@ -147,6 +153,24 @@ class UI(GObject.GObject):
                        self['tlbtn_go_forward']):
             bind('handle', widget, 'sensitive')
 
+    def fn_contents_sort_names(self,
+                               model: Gtk.TreeModel,
+                               l: Gtk.TreeIter,
+                               r: Gtk.TreeIter,
+                               data: object):
+        col_obj = ModelColsContents.Entity
+        col_name = ModelColsContents.Display
+        if model[l][col_obj] and model[r][col_obj]:
+            left = model[l][col_name]
+            right = model[r][col_name]
+            if left < right:
+                return -1
+            elif left == right:
+                return 0
+            else:
+                return 1
+        return 0
+
     @GObject.Signal
     def launch(self, *args):
         self['win_main'].show()
@@ -179,7 +203,7 @@ class UI(GObject.GObject):
                     GLib.markup_escape_text(entity.source_name)))
             if entity.full_name:
                 # We will never have the situation where an entity has a full
-                # name but no source name because the full name will have 
+                # name but no source name because the full name will have
                 # been computed from the source name. So it's safe to prepend
                 # the string with a newline
                 out.append('\n<b>{:7}</b> {}'.format(
@@ -192,24 +216,24 @@ class UI(GObject.GObject):
         module: Module = self.app.module
         self.srcbuf_llvm.set_text(lb.module_get_code(module.handle))
 
-        trvw = self['trvw_contents']
-        trfltr = trvw.get_model()
-        trst = self['trst_contents']
-
-        trvw.set_model(None)
-        trst.clear()
+        self.trvw_contents.set_model(None)
+        self.trst_contents.clear()
         for label, entities in [('Aliases', module.aliases),
                                 ('Functions', module.functions),
                                 ('Globals', module.globals),
                                 ('Structs', module.structs)]:
-            trit = trst.append(None, [None, label, '', Pango.Style.NORMAL])
+            trit = self.trst_contents.append(None,
+                                             [None,
+                                              label, 
+                                              '', 
+                                              Pango.Style.NORMAL])
             for entity in entities:
-                trst.append(trit,
-                            [entity,
-                             entity.llvm_name,
-                             get_tooltip(entity),
-                             get_style(entity)])
-        trvw.set_model(trfltr)
+                self.trst_contents.append(trit,
+                                          [entity,
+                                           entity.llvm_name,
+                                           get_tooltip(entity),
+                                           get_style(entity)])
+        self.trvw_contents.set_model(self.trsrt_contents)
 
     def on_open_recent(self, widget: Gtk.Widget) -> bool:
         file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
@@ -256,6 +280,16 @@ class UI(GObject.GObject):
         dlg = self['dlg_about']
         dlg.run()
         dlg.hide()
+        return False
+
+    def on_contents_toggle_expand_all(self,
+                                      tvcol: Gtk.TreeViewColumn) -> bool:
+        if tvcol.get_title() == '+':
+            self.trvw_contents.expand_all()
+            tvcol.set_title('-')
+        else:
+            self.trvw_contents.collapse_all()
+            tvcol.set_title('+')
         return False
 
     def on_entity_selected(self,

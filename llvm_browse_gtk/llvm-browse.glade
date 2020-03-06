@@ -480,6 +480,9 @@
   <object class="GtkTreeModelFilter" id="trfltr_contents">
     <property name="child_model">trst_contents</property>
   </object>
+  <object class="GtkTreeModelSort" id="trsrt_contents">
+    <property name="model">trfltr_contents</property>
+  </object>
   <object class="GtkApplicationWindow" id="win_main">
     <property name="can_focus">False</property>
     <property name="default_width">660</property>
@@ -1005,7 +1008,7 @@
                                 <property name="can_focus">True</property>
                                 <property name="hexpand">True</property>
                                 <property name="vexpand">True</property>
-                                <property name="model">trfltr_contents</property>
+                                <property name="model">trsrt_contents</property>
                                 <property name="search_column">1</property>
                                 <property name="tooltip_column">2</property>
                                 <signal name="row-activated" handler="on_entity_selected" swapped="no"/>
@@ -1014,14 +1017,18 @@
                                 </child>
                                 <child>
                                   <object class="GtkTreeViewColumn" id="tvcol_expander">
-                                    <property name="sizing">fixed</property>
+                                    <property name="title" translatable="yes">+</property>
                                     <property name="clickable">True</property>
+                                    <property name="alignment">0.5</property>
+                                    <signal name="clicked" handler="on_contents_toggle_expand_all" swapped="no"/>
                                   </object>
                                 </child>
                                 <child>
                                   <object class="GtkTreeViewColumn" id="tvcol_name">
+                                    <property name="title" translatable="yes">Entities</property>
                                     <property name="expand">True</property>
                                     <property name="clickable">True</property>
+                                    <property name="sort_indicator">True</property>
                                     <property name="sort_column_id">1</property>
                                     <child>
                                       <object class="GtkCellRendererText" id="rndr_display"/>
