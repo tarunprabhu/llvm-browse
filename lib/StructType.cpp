@@ -11,6 +11,8 @@ StructType::StructType(llvm::StructType* llvm, Module& module) :
     set_tag(llvm->getName(), "%");
   else
     critical() << "Cannot set tag for unnamed struct: " << *get_llvm() << "\n";
+
+  // TODO: Get the source name and the full name from the DebugInfo
 }
 
 bool StructType::has_source_info() const {
@@ -28,8 +30,7 @@ bool StructType::has_source_name() const {
 }
 
 llvm::StringRef StructType::get_source_name() const {
-	// TODO: Implement this
-	return llvm::StringRef("");
+	return llvm::StringRef(source_name);
 }
 
 llvm::StringRef StructType::get_llvm_name() const {

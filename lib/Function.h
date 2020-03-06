@@ -27,6 +27,7 @@ protected:
   std::vector<Argument*> args;
   std::vector<BasicBlock*> bbs;
   const llvm::DISubprogram* di;
+  std::string source_name;
   std::string full_name;
 
 public:

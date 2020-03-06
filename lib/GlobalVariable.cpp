@@ -26,6 +26,7 @@ GlobalVariable::GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module) :
   if(dis.size() == 1) {
     di = dis[0]->getVariable();
     set_source_defn(SourceRange(di->getFilename().data(), di->getLine(), 1));
+    source_name = DebugInfo::get_name(di);
     full_name = DebugInfo::get_full_name(di);
   } else if(dis.size() > 1) {
     warning() << "Could not find unique debug info for global: " << llvm_g
@@ -50,7 +51,7 @@ GlobalVariable::has_full_name() const {
 
 llvm::StringRef
 GlobalVariable::get_source_name() const {
-  return has_source_info() ? di->getName() : llvm::StringRef();
+	return llvm::StringRef(source_name);
 }
 
 llvm::StringRef

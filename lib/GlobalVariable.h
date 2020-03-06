@@ -20,6 +20,7 @@ class alignas(ALIGN_OBJ) GlobalVariable :
     IWrapper<llvm::GlobalVariable> {
 protected:
   const llvm::DIGlobalVariable* di;
+  std::string source_name;
   std::string full_name;
 
 public:

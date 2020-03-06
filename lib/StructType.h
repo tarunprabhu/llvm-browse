@@ -21,6 +21,7 @@ protected:
   // odd, but that might just be because you almost never see them anywhere
   // in LLVM's APIs. So the types remain non-const.
   llvm::StructType* llvm;
+  std::string source_name;
   std::string full_name;
 
 public:

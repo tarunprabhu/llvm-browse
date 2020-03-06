@@ -24,6 +24,7 @@ Function::Function(llvm::Function& llvm_f, Module& module) :
     bbs.push_back(&get_module().add(bb, *this));
 
   if(di) {
+    source_name = DebugInfo::get_name(di);
     full_name = DebugInfo::get_full_name(di);
     set_source_defn(SourceRange(di->getFilename().data(), di->getLine(), 1));
   }
@@ -42,7 +43,7 @@ bool Function::has_full_name() const {
 }
 
 llvm::StringRef Function::get_source_name() const {
-  return has_source_info() ? di->getName() : llvm::StringRef();
+  return llvm::StringRef(source_name);
 }
 
 llvm::StringRef Function::get_full_name() const {
