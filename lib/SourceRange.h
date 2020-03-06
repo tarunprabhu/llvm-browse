@@ -1,6 +1,10 @@
 #ifndef LLVM_BROWSE_SOURCE_RANGE_H
 #define LLVM_BROWSE_SOURCE_RANGE_H
 
+#include "Typedefs.h"
+
+namespace lb {
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -18,7 +22,7 @@ struct SourcePoint {
 
 // Represents a range in the source file. This is separate from an LLVMRange
 // because most of this information will come from LLVM's DI* objects
-struct SourceRange {
+struct alignas(ALIGN_OBJ) SourceRange {
   // Full path to the source file. We can keep the pointer here because
   // if we do have a file, then it will be owned by one of the DI* objects
   // in the IR
@@ -44,5 +48,7 @@ struct SourceRange {
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
+
+} // namespace
 
 #endif // LLVM_BROWSE_SOURCE_RANGE_H

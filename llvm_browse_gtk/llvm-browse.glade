@@ -467,8 +467,8 @@
   </object>
   <object class="GtkTreeStore" id="trst_contents">
     <columns>
-      <!-- column-name Handle -->
-      <column type="gulong"/>
+      <!-- column-name Entity -->
+      <column type="GObject"/>
       <!-- column-name Display -->
       <column type="gchararray"/>
       <!-- column-name Tooltip -->
@@ -1008,6 +1008,7 @@
                                 <property name="model">trfltr_contents</property>
                                 <property name="search_column">1</property>
                                 <property name="tooltip_column">2</property>
+                                <signal name="row-activated" handler="on_entity_selected" swapped="no"/>
                                 <child internal-child="selection">
                                   <object class="GtkTreeSelection" id="trsel_contents"/>
                                 </child>
@@ -1019,6 +1020,7 @@
                                 </child>
                                 <child>
                                   <object class="GtkTreeViewColumn" id="tvcol_name">
+                                    <property name="expand">True</property>
                                     <property name="clickable">True</property>
                                     <property name="sort_column_id">1</property>
                                     <child>

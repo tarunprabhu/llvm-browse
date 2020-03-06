@@ -525,7 +525,7 @@ Parser::link(Module& module) {
       // instruction
       size_t bb_begin
           = module.get(llvm_bb.front()).get_llvm_defn().begin;
-      bb.set_llvm_range(LLVMRange(bb_begin, bb_begin));
+      bb.set_llvm_span(LLVMRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular
@@ -548,12 +548,12 @@ Parser::link(Module& module) {
       }
 
       if(bb_end != llvm::StringRef::npos)
-        bb.set_llvm_range(LLVMRange(bb_begin, bb_end));
+        bb.set_llvm_span(LLVMRange(bb_begin, bb_end));
     }
 
     size_t f_end = module.get(llvm_f.back()).get_llvm_defn().end;
     if(f_end != llvm::StringRef::npos)
-      f.set_llvm_range(LLVMRange(f_begin, f_end + 1));
+      f.set_llvm_span(LLVMRange(f_begin, f_end + 1));
   }
 
   message() << "Processing metadata\n";

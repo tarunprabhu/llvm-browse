@@ -44,18 +44,18 @@ protected:
   // of the op code
   LLVMRange llvm_defn;
 
-  // The LLVM range is the range in characters that the entity covers in
+  // The LLVM span is the range in characters that the entity covers in
   // the IR. For functions, this is the entire body, for basic blocks, all
   // the characters from the start of the first instruction in the block to
   // the end of the last. It may be invalid for other entities
-  LLVMRange llvm_range;
+  LLVMRange llvm_span;
 
   // The source defn is the range in characters in the source code that 
   // the definition of the entity covers. For functions and globals, this 
   // will simply span the beginning to the end of the name in the source code
   SourceRange source_defn;
 
-  // The source range is the range in characters in the source code that the
+  // The source span is the range in characters in the source code that the
   // entity covers. This is a somewhat more nebulous range because there may not
   // be a reasonable mapping from the source to LLVM. For instance, multiple
   // instructions could map to the same lines in the source code in which case
@@ -63,7 +63,7 @@ protected:
   // Still, this is mainly here so we have a decent starting point at which
   // to position the cursor in the source even if we can't do anything else
   // beyond that 
-  SourceRange source_range;
+  SourceRange source_span;
 
   // This is sort of messy because not everything that is navigable ought to
   // have a use. The exeception are struct types that also have a definition
@@ -93,25 +93,24 @@ public:
   void add_use(const LLVMRange& range);
 
   void set_llvm_defn(const LLVMRange& range);
-  void set_llvm_range(const LLVMRange& range);
+  void set_llvm_span(const LLVMRange& range);
   void set_source_defn(const SourceRange& range);
-  void set_source_range(const SourceRange& range);
+  void set_source_span(const SourceRange& range);
 
   Iterator begin() const;
   Iterator end() const;
   llvm::iterator_range<Iterator> uses() const;
   unsigned get_num_uses() const;
-  const LLVMRange* get_uses_c() const;
   bool has_tag() const;
   llvm::StringRef get_tag() const;
   bool has_llvm_defn() const;
-  bool has_llvm_range() const;
+  bool has_llvm_span() const;
   bool has_source_defn() const;
-  bool has_source_range() const;
+  bool has_source_span() const;
   const LLVMRange& get_llvm_defn() const;
-  const LLVMRange& get_llvm_range() const;
+  const LLVMRange& get_llvm_span() const;
   const SourceRange& get_source_defn() const;
-  const SourceRange& get_source_range() const;
+  const SourceRange& get_source_span() const;
 };
 
 } // namespace lb

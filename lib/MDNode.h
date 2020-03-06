@@ -6,13 +6,16 @@
 
 #include "INavigable.h"
 #include "IWrapper.h"
+#include "Typedefs.h"
 #include "SourceRange.h"
 
 namespace lb {
 
 class Module;
 
-class MDNode : public INavigable, public IWrapper<llvm::MDNode> {
+class alignas(ALIGN_OBJ) MDNode :
+    public INavigable,
+    public IWrapper<llvm::MDNode> {
 public:
   MDNode(llvm::MDNode& llvm, unsigned slot, Module& module);
   virtual ~MDNode() = default;

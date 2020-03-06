@@ -11,11 +11,11 @@ using llvm::isa;
 
 namespace lb {
 
-BasicBlock::BasicBlock(llvm::BasicBlock& llvm_bb, Module& module) :
+BasicBlock::BasicBlock(llvm::BasicBlock& llvm_bb, Function& f, Module& module) :
     Value(Value::Kind::BasicBlock),
     INavigable(), IWrapper<llvm::BasicBlock>(llvm_bb, module) {
   for(llvm::Instruction& inst : llvm_bb)
-    insts.push_back(&get_module().add(inst));
+    insts.push_back(&get_module().add(inst, f));
 }
 
 BasicBlock::Iterator

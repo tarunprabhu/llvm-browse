@@ -51,8 +51,8 @@ INavigable::set_llvm_defn(const LLVMRange& range) {
 }
 
 void
-INavigable::set_llvm_range(const LLVMRange& range) {
-  llvm_range = range;
+INavigable::set_llvm_span(const LLVMRange& range) {
+  llvm_span = range;
 }
 
 void
@@ -61,8 +61,8 @@ INavigable::set_source_defn(const SourceRange& range) {
 }
 
 void
-INavigable::set_source_range(const SourceRange& range) {
-  source_range = range;
+INavigable::set_source_span(const SourceRange& range) {
+  source_span = range;
 }
 
 bool
@@ -95,24 +95,20 @@ INavigable::get_num_uses() const {
   return m_uses.size();
 }
 
-const LLVMRange* INavigable::get_uses_c() const {
-  return m_uses.data();
-}
-
 bool INavigable::has_llvm_defn() const {
   return llvm_defn;
 }
 
-bool INavigable::has_llvm_range() const {
-  return llvm_range;
+bool INavigable::has_llvm_span() const {
+  return llvm_span;
 }
 
 bool INavigable::has_source_defn() const {
   return source_defn;
 }
 
-bool INavigable::has_source_range() const {
-  return source_range;
+bool INavigable::has_source_span() const {
+  return source_span;
 }
 
 const LLVMRange&
@@ -121,8 +117,8 @@ INavigable::get_llvm_defn() const {
 }
 
 const LLVMRange&
-INavigable::get_llvm_range() const {
-  return llvm_range;
+INavigable::get_llvm_span() const {
+  return llvm_span;
 }
 
 const SourceRange&
@@ -130,8 +126,9 @@ INavigable::get_source_defn() const {
   return source_defn;
 }
 const SourceRange&
-INavigable::get_source_range() const {
-  return source_range;
+INavigable::get_source_span() const {
+  return source_span;
 }
 
 } // namespace lb
+  

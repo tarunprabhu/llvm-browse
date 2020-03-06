@@ -1,6 +1,8 @@
 #include "SourceRange.h"
 #include "Module.h"
 
+namespace lb {
+
 SourcePoint::SourcePoint(unsigned line, unsigned column) :
     line(line), column(column) {
   ;
@@ -24,3 +26,5 @@ SourceRange::SourceRange(const char* file,
     begin({begin_line, begin_column}), end({end_line, end_column}) {
   ;
 }
+
+} // namespace lb

@@ -22,13 +22,13 @@ class BasicBlock :
     public INavigable,
     public IWrapper<llvm::BasicBlock> {
 protected:
-  std::vector<const Instruction*> insts;
+  std::vector<Instruction*> insts;
 
 public:
   using Iterator = decltype(insts)::const_iterator;
 
 public:
-  BasicBlock(llvm::BasicBlock& llvm_bb, Module& module);
+  BasicBlock(llvm::BasicBlock& llvm_bb, Function& f, Module& module);
   virtual ~BasicBlock() = default;
 
   Iterator begin() const;

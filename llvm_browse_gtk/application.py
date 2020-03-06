@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-# from .module import Module
-from .ui import UI
+import llvm_browse as lb
+from .module import Module
 from .options import Options
 from typing import Union, List
+from .ui import UI
 import gi
 gi.require_version('GLib', '${PY_GLIB_VERSION}')
 gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
@@ -18,26 +19,23 @@ GObject.type_register(GtkSource.View)
 
 
 class Application(Gtk.Application):
-    llvm = GObject.Property(
+    handle = GObject.Property(
         type=GObject.TYPE_UINT64,
         default=0,
-        nick='llvm',
-        blurb='The path to the LLVM file currently shown or ""')
+        nick='handle',
+        blurb='Handle to the LLVM module')
 
-    llvm_file = GObject.Property(
+    module = GObject.Property(
+        type=GObject.GObject,
+        default=None,
+        nick='module',
+        blurb='A module object wrapper')
+
+    llvm = GObject.Property(
         type=str,
         default='',
-        nick='llvm-file',
-        blurb='The LLVM file that is currently loaded')
-
-    # This property is here because we cannot bind the LLVM string property
-    # directly to boolean properties of widgets because we can't set
-    # transform functions when binding properties
-    loaded = GObject.Property(
-        type=bool,
-        default=False,
-        nick='loaded',
-        blurb='True if a LLVM file has been loaded')
+        nick='llvm',
+        blurb='The path to the LLVM file currently shown or ""')
 
     def __init__(self):
         Gtk.Application.__init__(self)
@@ -48,42 +46,44 @@ class Application(Gtk.Application):
         self.argv: argparse.Namespace = None
         self.options: Options = Options(self)
         self.ui: UI = UI(self)
-        self.module: Module = None
 
     def _reset(self):
-        self.llvm = 0
-        self.llvm_file = ''
+        self.handle = 0
+        self.llvm = ''
+        self.module = None
 
     def do_activate(self) -> bool:
         self.options.load()
         self.add_window(self.ui.get_application_window())
         self.ui.emit('launch')
+        if self.argv.maximize:
+            self.ui.win_main.maximize()
         if self.argv.file:
             self.action_open(self.argv.file)
         return False
 
     # Returns true if the file could be opened
     def action_open(self, file: str) -> bool:
-        self.llvm_file = file
-        self.llvm = lb_module_create(file)
-        self.module = Module(self.llvm)
-        if not self.llvm:
+        self.llvm = file
+        self.handle = lb.module_create(file)
+        if not self.handle:
             self._reset()
         else:
+            self.module = Module(self.handle)
             self.ui.do_open()
-        return bool(self.llvm)
+        return bool(self.handle)
 
     # Returns true if the file could be closed
     def action_close(self):
-        if self.llvm:
-            lb_module_free(self.llvm)
+        if self.handle:
+            lb_module_free(self.handle)
         self._reset()
         return True
 
     # Returns true if the file could be reloaded
     def action_reload(self):
-        if self.llvm_file:
-            if not self.action_open(self, self.llvm_file):
+        if self.llvm:
+            if not self.action_open(self, self.llvm):
                 self._reset()
                 return False
             return True
@@ -91,8 +91,8 @@ class Application(Gtk.Application):
 
     # Returns true on success. Not sure if this will actually return
     def action_quit(self) -> bool:
-        if self.llvm:
-            self.lb_module_free(self.llvm)
+        if self.handle:
+            self.lb_module_free(self.handle)
             self._reset()
         self.remove_window(self.ui.get_application_window())
         return True

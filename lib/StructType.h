@@ -5,12 +5,15 @@
 
 #include "INavigable.h"
 #include "IWrapper.h"
+#include "Typedefs.h"
 
 namespace lb {
 
 class Module;
 
-class StructType : public INavigable, public IWrapper<llvm::StructType*> {
+class alignas(ALIGN_OBJ) StructType :
+    public INavigable,
+    public IWrapper<llvm::StructType*> {
 protected:
   // For reasons that I ought to remember but can't, declaring LLVM types as
   // const causes problems (I think it's with the DataLayout objects that we
@@ -18,10 +21,17 @@ protected:
   // odd, but that might just be because you almost never see them anywhere
   // in LLVM's APIs. So the types remain non-const.
   llvm::StructType* llvm;
+  std::string full_name;
 
 public:
   StructType(llvm::StructType* llvm, Module& module);
   virtual ~StructType() = default;
+
+  bool has_source_info() const;
+  bool has_source_name() const;
+  llvm::StringRef get_source_name() const;
+  llvm::StringRef get_llvm_name() const;
+  llvm::StringRef get_full_name() const;
 };
 
 } // namespace lb

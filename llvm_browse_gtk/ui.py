@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+from .entity import Entity
+from enum import IntEnum
+import llvm_browse as lb
 import os
 import gi
 gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
@@ -10,7 +13,15 @@ gi.require_version('Gio', '${PY_GIO_VERSION}')
 gi.require_version('Gtk', '${PY_GDK_VERSION}')
 gi.require_version('Pango', '${PY_PANGO_VERSION}')
 gi.require_version('GtkSource', '${PY_GTKSOURCE_VERSION}')
-from gi.repository import GObject, GLib, Gdk, GdkPixbuf, Gio, Gtk, GtkSource  # NOQA: E402
+from gi.repository import (GObject, GLib, Gdk, GdkPixbuf,
+                           Gio, Gtk, GtkSource, Pango)  # NOQA: E402
+
+
+class ModelColsContents(IntEnum):
+    Entity = 0
+    Display = 1
+    Tooltip = 2
+    Style = 3
 
 
 class UI(GObject.GObject):
@@ -22,8 +33,10 @@ class UI(GObject.GObject):
 
         self.builder = Gtk.Builder.new_from_resource(
             '/llvm-browse/gtk/llvm-browse.ui')
-        self.srcbuf_llvm = self['srcvw_llvm'].get_buffer()
-        self.srcbuf_code = self['srcvw_source'].get_buffer()
+        self.srcvw_llvm = self['srcvw_llvm']
+        self.srcbuf_llvm = self.srcvw_llvm.get_buffer()
+        self.srcvw_code = self['srcvw_source']
+        self.srcbuf_code = self.srcvw_code.get_buffer()
         self.mgr_lang = GtkSource.LanguageManager.get_default()
         self.mgr_style = GtkSource.StyleSchemeManager.get_default()
         self.win_main = self['win_main']
@@ -132,7 +145,7 @@ class UI(GObject.GObject):
                        self['tlbtn_go_back'],
                        self['mitm_go_forward'],
                        self['tlbtn_go_forward']):
-            bind('llvm', widget, 'sensitive')
+            bind('handle', widget, 'sensitive')
 
     @GObject.Signal
     def launch(self, *args):
@@ -140,33 +153,63 @@ class UI(GObject.GObject):
         if self.options.window_maximized:
             self['win_main'].maximize()
 
+    def do_async(self, fn, *args):
+        def impl(*args):
+            fn(*args)
+            return False
+
+        GLib.idle_add(impl, *args, priority=GLib.PRIORITY_DEFAULT_IDLE)
+
     def do_open(self):
-        def get_style(artificial: bool) -> Pango.Style:
-            if artificial:
+        def get_style(entity: Entity) -> Pango.Style:
+            if entity.artificial:
                 return Pango.Style.ITALIC
             return Pango.Style.NORMAL
 
-        self.srcbuf_llvm.set_text(lb_module_get_llvm(self.app.llvm))
+        def get_tooltip(entity: Entity) -> str:
+            if (not entity.source_name) and (not entity.full_name):
+                return ''
+
+            # TODO: Use the same font as the rest of the code
+            out = []
+            out.append('<tt>')
+            if entity.source_name:
+                out.append('<b>{:7}</b> {}'.format(
+                    'Source',
+                    GLib.markup_escape_text(entity.source_name)))
+            if entity.full_name:
+                # We will never have the situation where an entity has a full
+                # name but no source name because the full name will have 
+                # been computed from the source name. So it's safe to prepend
+                # the string with a newline
+                out.append('\n<b>{:7}</b> {}'.format(
+                    'Full',
+                    GLib.markup_escape_text(entity.full_name)))
+            out.append('</tt>')
+
+            return ''.join(out)
+
+        module: Module = self.app.module
+        self.srcbuf_llvm.set_text(lb.module_get_code(module.handle))
 
         trvw = self['trvw_contents']
         trfltr = trvw.get_model()
         trst = self['trst_contents']
-        module = self.app.module
 
         trvw.set_model(None)
         trst.clear()
-        for label, entities in zip(
-            ['Aliases', 'Functions', 'Globals', 'Structs'],
-                [module.aliases, module.functions, module.globals,
-                 module.structs]):
-            trit = module.add(None, [0, label, '', Pango.Style.Normal])
+        for label, entities in [('Aliases', module.aliases),
+                                ('Functions', module.functions),
+                                ('Globals', module.globals),
+                                ('Structs', module.structs)]:
+            trit = trst.append(None, [None, label, '', Pango.Style.NORMAL])
             for entity in entities:
-                module.add(trit,
-                           [entity,
-                            lb_entity_get_llvm_name(entity),
-                            lb_entity_get_source_name(entity),
-                            get_style(lb_entity_is_artificial(entity))])
-        trvw.get_model(trfltr)
+                trst.append(trit,
+                            [entity,
+                             entity.llvm_name,
+                             get_tooltip(entity),
+                             get_style(entity)])
+        trvw.set_model(trfltr)
 
     def on_open_recent(self, widget: Gtk.Widget) -> bool:
         file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
@@ -215,6 +258,27 @@ class UI(GObject.GObject):
         dlg.hide()
         return False
 
+    def on_entity_selected(self,
+                           trvw: Gtk.TreeView,
+                           path: Gtk.TreePath,
+                           col: Gtk.TreeViewColumn) -> bool:
+        def update_ui(i: Gtk.TreeIter) -> bool:
+            self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
+            return False
+
+        model = trvw.get_model()
+        row = model.get_iter(path)
+        entity = model[row][ModelColsContents.Entity]
+        if entity:
+            offset = entity.llvm_defn.begin
+            off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
+            line = off_iter.get_line()
+            line_iter = self.srcbuf_llvm.get_iter_at_line(line)
+            self.srcbuf_llvm.place_cursor(line_iter)
+            self.do_async(update_ui, line_iter)
+
+        return False
+
     def on_goto_line(self, *args) -> bool:
         return False
 
@@ -243,6 +307,10 @@ class UI(GObject.GObject):
         return False
 
     def on_toggle_fullscreen(self, *args) -> bool:
+        if self['mitm_toggle_fullscreen'].get_active():
+            self.win_main.fullscreen()
+        else:
+            self.win_main.unfullscreen()
         return False
 
     def get_application_window(self) -> Gtk.ApplicationWindow:

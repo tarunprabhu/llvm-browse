@@ -12,7 +12,7 @@ find_package(PkgConfig)
 # Configure Python
 #
 # TODO: Allow for an alternative Python installation maybe?
-#  
+#
 #  -DINSTALL_AS_USER=<bool>
 #     To install without superuser permissions
 #
@@ -25,12 +25,12 @@ if(NOT Python_Interpreter_FOUND)
   message(FATAL_ERROR "Could not find Python interpreter")
 endif()
 if(Python_VERSION VERSION_LESS "${PYTHON_MINIMUM_VERSION}")
-  message(FATAL_ERROR 
+  message(FATAL_ERROR
     "Python minimum version required: ${PYTHON_MINIMUM_VERSION}")
 endif()
 
 if(INSTALL_AS_USER)
-  execute_process(COMMAND 
+  execute_process(COMMAND
     ${Python_EXECUTABLE} -m site --user-site
     OUTPUT_VARIABLE Python_INSTALL_FULL_SITEDIR
     RESULT_VARIABLE USER_SITE_FOUND
@@ -53,7 +53,7 @@ endif()
 # Python_SOABI is set automatically by later versions of CMake
 if(NOT Python_SOABI)
   execute_process(COMMAND
-    ${Python_EXECUTABLE} 
+    ${Python_EXECUTABLE}
     -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
     OUTPUT_VARIABLE Python_SOABI
     RESULT_VARIABLE SOABI_FOUND
@@ -76,7 +76,7 @@ message(STATUS "Python extension suffix: ${Python_SOABI}")
 #
 # -DLLVM_LINK_SHARED=<bool>
 #    to link against LLVM's dynamic libraries instead of static libraries
-# 
+#
 set(LLVM_MINIMUM_VERSION 8.0.0)
 if(LLVM_DIR)
   message(STATUS "Looking for LLVM in ${LLVM_DIR}")
@@ -131,11 +131,11 @@ else()
   message(STATUS "LLVM libraries: ${LLVM_LIBS}")
 endif()
 
-# Configure other required pcakages. 
-# 
-# FIXME?: This currently assumes that if we can find the pkgconfig, 
-# then the Python bindings will also have been installed. This might not be the 
-# case but I'm not sure. Probably should find another way of doing this 
+# Configure other required packages.
+#
+# FIXME?: This currently assumes that if we can find the pkgconfig,
+# then the Python bindings will also have been installed. This might not be the
+# case but I'm not sure. Probably should find another way of doing this
 # just in case
 
 # GObject
@@ -210,7 +210,7 @@ file(REMOVE_RECURSE ${PROJECT_BINARY_DIR}/tmp)
 set(CMAKE_SKIP_BUILD_RPATH False)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH False)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
-set(CMAKE_INSTALL_RPATH ${PROJECT_INSTALL_LIB_DIR})
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fPIC)
 add_compile_options(

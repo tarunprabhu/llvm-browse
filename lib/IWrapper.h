@@ -8,15 +8,20 @@ class Module;
 // Yes, it's an interface and really shouldn't have any data items ...
 template<typename LLVM_T>
 class IWrapper {
+public:
+  typedef std::conditional_t<std::is_pointer<LLVM_T>::value, LLVM_T, LLVM_T&>
+      WrappedType;
+
 private:
-  LLVM_T& llvm_t;
+  WrappedType llvm_t;
   Module& module;
 
 protected:
   IWrapper()           = delete;
   IWrapper(IWrapper&)  = delete;
   IWrapper(IWrapper&&) = delete;
-  IWrapper(LLVM_T& llvm_t, Module& module) : llvm_t(llvm_t), module(module) {
+  IWrapper(WrappedType llvm_t, Module& module) :
+      llvm_t(llvm_t), module(module) {
     ;
   }
 
@@ -31,7 +36,7 @@ public:
     return module;
   }
 
-  const LLVM_T& get_llvm() const {
+  const WrappedType get_llvm() const {
     return llvm_t;
   }
 };

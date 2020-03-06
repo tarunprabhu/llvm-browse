@@ -17,15 +17,12 @@
 namespace lb {
 
 Module::Module(std::unique_ptr<llvm::Module> module,
-               std::unique_ptr<llvm::LLVMContext> context) :
+               std::unique_ptr<llvm::LLVMContext> context,
+               std::unique_ptr<llvm::MemoryBuffer> mbuf) :
     context(std::move(context)),
-    llvm(std::move(module)) {
+    llvm(std::move(module)),
+    buffer(std::move(mbuf)) {
   ;
-}
-
-BufferId
-Module::get_next_available_id() {
-  return buffers.size();
 }
 
 bool
@@ -38,19 +35,14 @@ Module::contains(const llvm::MDNode& llvm) const {
   return mmap.find(&llvm) != mmap.end();
 }
 
-bool
-Module::contains_main() const {
-  return buffers.find(Module::get_main_id()) != buffers.end();
-}
-
 Argument&
-Module::add(llvm::Argument& llvm) {
-  return add<Argument>(llvm);
+Module::add(llvm::Argument& llvm, Function& f) {
+  return add<Argument>(llvm, f);
 }
 
 BasicBlock&
-Module::add(llvm::BasicBlock& llvm) {
-  return add<BasicBlock>(llvm);
+Module::add(llvm::BasicBlock& llvm, Function& f) {
+  return add<BasicBlock>(llvm, f);
 }
 
 Function&
@@ -75,8 +67,8 @@ Module::add(llvm::GlobalVariable& llvm) {
 }
 
 Instruction&
-Module::add(llvm::Instruction& llvm) {
-  return add<Instruction>(llvm);
+Module::add(llvm::Instruction& llvm, Function& f) {
+  return add<Instruction>(llvm, f);
 }
 
 MDNode&
@@ -95,39 +87,6 @@ Module::add(llvm::StructType* llvm) {
   m_structs.push_back(ptr);
   tmap[llvm] = ptr;
   return *ptr;
-}
-
-BufferId
-Module::add_file(const std::string& file) {
-  BufferId id = Module::get_invalid_id();
-  if(llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileOrErr
-     = llvm::MemoryBuffer::getFile(file)) {
-    id = get_next_available_id();
-    buffers.emplace(std::make_pair(id, std::move(fileOrErr.get())));
-  }
-  return id;
-}
-
-BufferId
-Module::add_main(const std::string& file) {
-  BufferId id = Module::get_main_id();
-  // FIXME: Add error checking and reporting. Should only set the main buffer
-  // exactly once
-  if(llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileOrErr
-     = llvm::MemoryBuffer::getFile(file)) {
-    buffers.emplace(std::make_pair(id, std::move(fileOrErr.get())));
-  }
-  return id;
-}
-
-BufferId
-Module::add_main(std::unique_ptr<llvm::MemoryBuffer> mbuf) {
-  BufferId id = Module::get_main_id();
-  // FIXME: Add error checking and reporting. Should set the main buffer
-  // exactly once
-  buffers.emplace(std::make_pair(id, std::move(mbuf)));
-
-  return id;
 }
 
 StructType&
@@ -221,18 +180,13 @@ Module::get(const llvm::Value& llvm) const {
 }
 
 llvm::MemoryBufferRef
-Module::get_buffer(BufferId id) const {
-  return buffers.at(id)->getMemBufferRef();
+Module::get_code_buffer() const {
+  return buffer->getMemBufferRef();
 }
 
 llvm::StringRef
-Module::get_contents(BufferId id) const {
-  return buffers.at(id)->getBuffer();
-}
-
-const char*
-Module::get_contents_as_cstr(BufferId id) const {
-  return buffers.at(id)->getBufferStart();
+Module::get_code() const {
+  return buffer->getBuffer();
 }
 
 llvm::iterator_range<Module::AliasIterator>
@@ -294,7 +248,7 @@ bool
 Module::check_range(const LLVMRange& range, llvm::StringRef tag) const {
   uint64_t begin          = range.begin;
   uint64_t end            = range.end;
-  llvm::StringRef slice = get_contents().substr(begin, end - begin);
+  llvm::StringRef slice   = get_code().substr(begin, end - begin);
   if(slice != tag)
     return false;
   return true;
@@ -310,7 +264,7 @@ Module::check_navigable(const INavigable& n) const {
       critical() << "Definition mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << tag << endl
-                 << "  Got:      " << get_contents().substr(begin, end - begin)
+                 << "  Got:      " << get_code().substr(begin, end - begin)
                  << "\n";
       return false;
     }
@@ -331,7 +285,7 @@ Module::check_uses(const INavigable& n) const {
       critical() << "Use mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << n.get_tag() << endl
-                 << "  Got:      " << get_contents().substr(begin, end - begin)
+                 << "  Got:      " << get_code().substr(begin, end - begin)
                  << "\n";
       return false;
     }
@@ -418,11 +372,11 @@ Module::create(const std::string& file) {
     std::unique_ptr<llvm::MemoryBuffer> fbuf = std::move(file_or_err.get());
     std::unique_ptr<llvm::MemoryBuffer> mbuf(nullptr);
     std::unique_ptr<llvm::Module> llvm(nullptr);
-    Parser parser;
 
     // We need this check because llvm::isBitcode() assumes that the buffer is
     // at least 4 bytes
     if(fbuf->getBufferSize() > 4) {
+      Parser parser;
       if(llvm::isBitcode(
              reinterpret_cast<const unsigned char*>(fbuf->getBufferStart()),
              reinterpret_cast<const unsigned char*>(fbuf->getBufferEnd())))
@@ -431,9 +385,15 @@ Module::create(const std::string& file) {
         std::tie(llvm, mbuf) = parser.parse_ir(std::move(fbuf), *context);
 
       if(llvm) {
-        module.reset(new Module(std::move(llvm), std::move(context)));
-        module->add_main(std::move(mbuf));
+        module.reset(
+            new Module(std::move(llvm), std::move(context), std::move(mbuf)));
         parser.link(*module);
+
+        // // Sort the uses because it makes it easier when jumping around 
+        // for(auto& i : module->vmap)
+        //   static_cast<INavigable*>(i.second)->sort_uses();
+        // for(auto& i : module->mmap)
+        //   i.second->sort_uses();
       }
     } else {
       critical() << "Could not find LLVM bitcode or IR\n";

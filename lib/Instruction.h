@@ -23,16 +23,19 @@ class Instruction :
     public IWrapper<llvm::Instruction> {
 protected:
   std::vector<SourceRange> ops;
+  bool di;
 
 public:
   using Iterator = decltype(ops)::const_iterator;
 
 public:
-  Instruction(llvm::Instruction& llvm_i, Module& module);
+  Instruction(llvm::Instruction& llvm_i, Function& f, Module& module);
   virtual ~Instruction() = default;
 
   void add_operand(const SourceRange& = SourceRange());
 
+  bool has_source_info() const;
+  llvm::StringRef get_llvm_name() const;
   SourceRange get_operand(unsigned i) const;
   Iterator begin() const;
   Iterator end() const;

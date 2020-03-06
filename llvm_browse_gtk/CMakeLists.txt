@@ -2,7 +2,16 @@ set(SOURCES
 	__init__.py
 	__main__.py
 	application.py
+	alias.py
+	argument.py
+	block.py
+	entity.py
+	function.py
+	global_variable.py
+	metadata.py
+	module.py
 	options.py
+	struct.py
 	ui.py)
 
 set(RESOURCES

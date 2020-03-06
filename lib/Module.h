@@ -34,14 +34,14 @@ class Value;
 // additional flags for the entities, they can be kept in one place that
 // makes sense
 //
-class Module {
+class alignas(ALIGN_OBJ) Module {
 protected:
   std::unique_ptr<llvm::LLVMContext> context;
   std::unique_ptr<llvm::Module> llvm;
   std::vector<std::unique_ptr<Value>> values;
   std::vector<std::unique_ptr<MDNode>> mds;
   std::vector<std::unique_ptr<StructType>> struct_types;
-  std::map<BufferId, std::unique_ptr<llvm::MemoryBuffer>> buffers;
+  std::unique_ptr<llvm::MemoryBuffer> buffer;
   std::vector<const Function*> m_functions;
   std::vector<const GlobalVariable*> m_globals;
   std::vector<const GlobalAlias*> m_aliases;
@@ -60,8 +60,8 @@ public:
 
 protected:
   Module(std::unique_ptr<llvm::Module> module,
-         std::unique_ptr<llvm::LLVMContext> context);
-  BufferId get_next_available_id();
+         std::unique_ptr<llvm::LLVMContext> context,
+         std::unique_ptr<llvm::MemoryBuffer> mbuf);
 
   template<typename T = Value>
   T& get(const llvm::Value& llvm) {
@@ -85,9 +85,10 @@ protected:
 
   template<typename T,
            typename LLVM,
+           typename... ArgsT,
            std::enable_if_t<!std::is_pointer<LLVM>::value, int> = 0>
-  T& add(LLVM& llvm) {
-    T* ptr = new T(llvm, *this);
+  T& add(LLVM& llvm, ArgsT&&... args) {
+    T* ptr = new T(llvm, args..., *this);
     values.emplace_back(ptr);
     vmap[&llvm] = ptr;
     return *ptr;
@@ -112,25 +113,19 @@ public:
   Module(const Module&&) = delete;
   virtual ~Module()      = default;
 
-  bool contains_main() const;
   bool contains(const llvm::Value& llvm) const;
   bool contains(const llvm::MDNode& llvm) const;
 
-  BufferId add_main(const std::string& file);
-  BufferId add_main(std::unique_ptr<llvm::MemoryBuffer> buffer);
-  BufferId add_file(const std::string& file);
-
-  llvm::MemoryBufferRef get_buffer(BufferId id = get_main_id()) const;
-  llvm::StringRef get_contents(BufferId id = get_main_id()) const;
-  const char* get_contents_as_cstr(BufferId id = get_main_id()) const;
+  llvm::MemoryBufferRef get_code_buffer() const;
+  llvm::StringRef get_code() const;
 
   // These should be refactored at some point so they are not public
-  Argument& add(llvm::Argument& llvm);
-  BasicBlock& add(llvm::BasicBlock& llvm);
+  Argument& add(llvm::Argument& llvm, Function& f);
+  BasicBlock& add(llvm::BasicBlock& llvm, Function& f);
   Function& add(llvm::Function& llvm);
   GlobalAlias& add(llvm::GlobalAlias& llvm);
   GlobalVariable& add(llvm::GlobalVariable& llvm);
-  Instruction& add(llvm::Instruction& llvm);
+  Instruction& add(llvm::Instruction& llvm, Function& f);
   MDNode& add(llvm::MDNode& llvm, unsigned slot);
   StructType& add(llvm::StructType* llvm);
 
@@ -168,14 +163,6 @@ public:
 
 public:
   static std::unique_ptr<Module> create(const std::string& file);
-
-  static constexpr BufferId get_invalid_id() {
-    return -1;
-  }
-
-  static constexpr BufferId get_main_id() {
-    return 0;
-  }
 
 public:
   // We want most (all?) of the public methods to be const. The only time the
