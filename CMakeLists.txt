@@ -148,6 +148,9 @@ function(check_python_bindings BINDING_NAME BINDING_VERSION)
     message(FATAL_ERROR "Missing required Python bindings: ${BINDING_NAME} ${BINDING_VERSION}\n${STDERR}")
   else()
     message(STATUS "  Found '${BINDING_NAME}' '${BINDING_VERSION}'")
+    # Set a variable in the parent scope so CMake doesn't run these checks 
+    # every time make is called
+    set(Py${BINDING_NAME}_FOUND 1 PARENT_SCOPE)
   endif()
 endfunction() 
 
