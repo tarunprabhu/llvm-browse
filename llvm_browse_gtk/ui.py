@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from .entity import Entity
 from enum import IntEnum
 import llvm_browse as lb
 import operator
@@ -28,6 +27,82 @@ class ModelColsContents(IntEnum):
     Font = 5
 
 
+# This is a tag applied to some range of the text. A tag will correspond to a
+# single entity. There could be several tags that apply at any one source
+# location. Tags may be completely nested within another, but they may not
+# partially overlap
+
+# Base class for the other tags that will be used here
+class LLVMTag(GtkSource.Tag):
+    start = GObject.Property(
+        type=int,
+        default=0,
+        nick='start',
+        blurb='The start offset for this tag')
+
+    end = GObject.Property(
+        type=int,
+        default=0,
+        nick='end',
+        blurb='The end offset for this tag')
+
+    use = GObject.Property(
+        type=GObject.GObject,
+        default=None,
+        nick='use',
+        blurb='The head of the use list for this definition')
+
+    def __init__(self, llvm_range):
+        GtkSource.Tag.__init__(self)
+
+        self.start = llvm_range.begin
+        self.end = llvm_range.end
+
+
+class DefinitionTag(LLVMTag):
+    entity = GObject.Property(
+        type=GObject.TYPE_UINT64,
+        default=None,
+        nick='entity',
+        blurb='The entity at this definition')
+
+    def __init__(self, llvm_range, entity: int):
+        LLVMTag.__init__(self, llvm_range)
+
+        self.entity = entity
+
+
+class UseTag(LLVMTag):
+    defn = GObject.Property(
+        type=DefinitionTag,
+        default=None,
+        nick='defn',
+        blurb='The definition associated with this use')
+
+    prev = GObject.Property(
+        type=LLVMTag,
+        default=None,
+        nick='prev',
+        blurb='The previous use in the chain')
+
+    next = GObject.Property(
+        type=LLVMTag,
+        default=None,
+        nick='next',
+        blurb='The next use in the chain')
+
+    def __init__(self,
+                 llvm_range,
+                 defn: DefinitionTag,
+                 prev: 'UseTag' = None):
+        LLVMTag.__init__(self, llvm_range)
+
+        self.defn = defn
+        self.prev = prev
+        if self.prev:
+            self.prev.next = self
+
+
 class UI(GObject.GObject):
     @staticmethod
     def fn_font_filter(family, face) -> bool:
@@ -51,6 +126,7 @@ class UI(GObject.GObject):
         self.srcbuf_llvm = self.srcvw_llvm.get_buffer()
         self.srcvw_code = self['srcvw_source']
         self.srcbuf_code = self.srcvw_code.get_buffer()
+        self.tag_table = self.srcbuf_llvm.get_tag_table()
         self.mgr_lang = GtkSource.LanguageManager.get_default()
         self.mgr_style = GtkSource.StyleSchemeManager.get_default()
         self.win_main = self['win_main']
@@ -168,7 +244,7 @@ class UI(GObject.GObject):
                        self['tlbtn_go_back'],
                        self['mitm_go_forward'],
                        self['tlbtn_go_forward']):
-            bind('handle', widget, 'sensitive')
+            bind('module', widget, 'sensitive')
 
     def fn_contents_sort_names(self,
                                model: Gtk.TreeModel,
@@ -215,83 +291,12 @@ class UI(GObject.GObject):
 
         GLib.idle_add(impl, *args, priority=GLib.PRIORITY_DEFAULT_IDLE)
 
-    def on_font_changed(self, *args):
-        font = self.options.font
-        css = ['textview {']
-        css.append('font-family: {};'.format(font.get_family()))
-        css.append('font-size: {}pt;'.format(font.get_size() / Pango.SCALE))
-        css.append('}')
-        provider = Gtk.CssProvider.get_default()
-        provider.load_from_data('\n'.join(css).encode('utf-8'))
-        for widget in (self.srcvw_llvm,
-                       self.srcvw_code):
-            style = widget.get_style_context()
-            style.add_provider(
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-    def do_open(self):
-        def get_style(entity: Entity) -> Pango.Style:
-            if entity.artificial:
-                return Pango.Style.ITALIC
-            return Pango.Style.NORMAL
-
-        def get_tooltip(entity: Entity) -> str:
-            if (not entity.source_name) and (not entity.full_name):
-                return ''
-
-            out = []
-            out.append('<span font_desc="{}">'.format(
-                self.options.font.to_string()))
-            if entity.source_name:
-                out.append('<b>{:7}</b> {}'.format(
-                    'Source',
-                    GLib.markup_escape_text(entity.source_name)))
-            if entity.full_name:
-                # We will never have the situation where an entity has a full
-                # name but no source name because the full name will have
-                # been computed from the source name. So it's safe to prepend
-                # the string with a newline
-                out.append('\n<b>{:7}</b> {}'.format(
-                    'Full',
-                    GLib.markup_escape_text(entity.full_name)))
-            out.append('</span>')
-
-            return ''.join(out)
-
-        module: Module = self.app.module
-        self.srcbuf_llvm.set_text(lb.module_get_code(module.handle))
-
-        self.trvw_contents.set_model(None)
-        self.trst_contents.clear()
-        for label, entities in [('Aliases', module.aliases),
-                                ('Functions', module.functions),
-                                ('Globals', module.globals),
-                                ('Structs', module.structs)]:
-            trit = self.trst_contents.append(None,
-                                             [None,
-                                              label,
-                                              '',
-                                              Pango.Style.NORMAL,
-                                              Pango.Weight.BOLD,
-                                              ''])
-            font = self.options.font.get_family()
-            for entity in entities:
-                self.trst_contents.append(trit,
-                                          [entity,
-                                           entity.llvm_name,
-                                           get_tooltip(entity),
-                                           get_style(entity),
-                                           Pango.Weight.NORMAL,
-                                           font])
-        self.trvw_contents.set_model(self.trsrt_contents)
-
-    def do_entity_select(self, entity: Entity):
+    def do_entity_select(self, entity: int):
         def update_ui(i: Gtk.TreeIter) -> bool:
             self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
             return False
 
-        offset = entity.llvm_defn.begin
+        offset = lb.entity_get_llvm_defn(entity).begin
         off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
         line = off_iter.get_line()
         line_iter = self.srcbuf_llvm.get_iter_at_line(line)
@@ -303,6 +308,113 @@ class UI(GObject.GObject):
             self.trvw_contents.collapse_row(path)
         else:
             self.trvw_contents.expand_row(path, True)
+
+    def do_populate_contents(self):
+        def get_style(entity: int) -> Pango.Style:
+            if lb.entity_is_artificial(entity):
+                return Pango.Style.ITALIC
+            return Pango.Style.NORMAL
+
+        def get_tooltip(entity: int) -> str:
+            source_name = lb.entity_get_source_name(entity)
+            full_name = lb.entity_get_full_name(entity)
+
+            out = []
+            if source_name:
+                out.append('<span font_desc="{}">'.format(
+                    self.options.font.to_string()))
+                if source_name:
+                    out.append('<b>{:7}</b> {}'.format(
+                        'Source',
+                        GLib.markup_escape_text(source_name)))
+                if full_name:
+                    # We will never have the situation where an entity has a
+                    # full name but no source name because the full name will
+                    # have been computed from the source name. So it's safe to
+                    # prepend the string with a newline
+                    out.append('\n<b>{:7}</b> {}'.format(
+                        'Full',
+                        GLib.markup_escape_text(full_name)))
+                out.append('</span>')
+
+            return ''.join(out)
+
+        def add_category(label: str) -> Gtk.TreeIter:
+            return self.trst_contents.append(
+                None, [lb.HANDLE_NULL,
+                       label,
+                       '',
+                       Pango.Style.NORMAL,
+                       Pango.Weight.BOLD,
+                       ''])
+
+        def add_entity(i: Gtk.TreeIter, entity: int):
+            self.trst_contents.append(
+                i, [entity,
+                    lb.entity_get_llvm_name(entity),
+                    get_tooltip(entity),
+                    get_style(entity),
+                    Pango.Weight.NORMAL,
+                    font])
+
+        self.trvw_contents.set_model(None)
+        self.trst_contents.clear()
+
+        module = self.app.module
+        font = self.options.font.get_family()
+        for label, entities in [('Aliases', lb.module_get_aliases(module)),
+                                ('Functions', lb.module_get_functions(module)),
+                                ('Globals', lb.module_get_globals(module)),
+                                ('Structs', lb.module_get_structs(module))]:
+            i = add_category(label)
+            for entity in entities:
+                add_entity(i, entity)
+
+        self.trvw_contents.set_model(self.trsrt_contents)
+
+    def do_compute_tags(self):
+        def add_tag(tag: LLVMTag) -> LLVMTag:
+            self.tag_table.add(tag)
+            self.srcbuf_llvm.apply_tag(
+                tag,
+                self.srcbuf_llvm.get_iter_at_offset(tag.start),
+                self.srcbuf_llvm.get_iter_at_offset(tag.end))
+
+            return tag
+
+        def add_tags(entity: int):
+            defn = lb.entity_get_llvm_defn(entity)
+            # If we can't get a definition for the entity, don't bother trying 
+            # to mark any uses
+            if defn:
+                defn_tag = add_tag(DefinitionTag(defn, entity))
+                prev_use = None
+                for use in lb.entity_get_uses(entity):
+                    use_tag = add_tag(UseTag(use, defn_tag, prev_use))
+                    prev_use = use_tag
+                    if not defn_tag.use:
+                        defn_tag.use = use_tag
+
+        module = self.app.module
+        for f in lb.module_get_functions(module):
+            add_tags(f)
+            for arg in lb.func_get_args(f):
+                add_tags(arg)
+            for bb in lb.func_get_blocks(f):
+                add_tags(bb)
+                for inst in lb.block_get_instructions(bb):
+                    add_tags(inst)
+
+        for entities in (lb.module_get_aliases(module),
+                         lb.module_get_globals(module)):
+            for entity in entities:
+                add_tags(entity)
+
+    def do_open(self):
+        self.srcbuf_llvm.set_text(lb.module_get_code(self.app.module))
+
+        self.do_populate_contents()
+        self.do_compute_tags()
 
     def on_open_recent(self, widget: Gtk.Widget) -> bool:
         file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
@@ -409,6 +521,21 @@ class UI(GObject.GObject):
         else:
             self.do_toggle_expand_row(path)
 
+    def on_srcvw_llvm_button(self,
+                             srcvw: GtkSource.View,
+                             evt: Gdk.EventButton) -> bool:
+        if (evt.type == Gdk.EventType.BUTTON_RELEASE) and (evt.button == 1):
+            x, y = srcvw.window_to_buffer_coords(
+                Gtk.TextWindowType.TEXT, evt.x, evt.y)
+            over_text, i = srcvw.get_iter_at_location(x, y)
+            if over_text:
+                for tag in i.get_tags():
+                    if isinstance(tag, DefinitionTag):
+                        print('Got definition', tag.entity.source_name)
+                    elif isinstance(tag, UseTag):
+                        print('Got use', tag)
+        return False
+
     def on_goto_line(self, *args) -> bool:
         return False
 
@@ -442,6 +569,21 @@ class UI(GObject.GObject):
         else:
             self.win_main.unfullscreen()
         return False
+
+    def on_font_changed(self, *args):
+        font = self.options.font
+        css = ['textview {']
+        css.append('font-family: {};'.format(font.get_family()))
+        css.append('font-size: {}pt;'.format(font.get_size() / Pango.SCALE))
+        css.append('}')
+        provider = Gtk.CssProvider.get_default()
+        provider.load_from_data('\n'.join(css).encode('utf-8'))
+        for widget in (self.srcvw_llvm,
+                       self.srcvw_code):
+            style = widget.get_style_context()
+            style.add_provider(
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def get_application_window(self) -> Gtk.ApplicationWindow:
         return self.win_main

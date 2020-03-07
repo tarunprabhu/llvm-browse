@@ -467,7 +467,7 @@
   <object class="GtkTreeStore" id="trst_contents">
     <columns>
       <!-- column-name Entity -->
-      <column type="GObject"/>
+      <column type="guint64"/>
       <!-- column-name Display -->
       <column type="gchararray"/>
       <!-- column-name Tooltip -->
@@ -1138,6 +1138,7 @@
                                     <property name="smart_home_end">before</property>
                                     <property name="highlight_current_line">True</property>
                                     <property name="indent_on_tab">False</property>
+                                    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
                                   </object>
                                 </child>
                               </object>

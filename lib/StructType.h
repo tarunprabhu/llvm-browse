@@ -33,6 +33,7 @@ public:
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  bool is_artificial() const;
 };
 
 } // namespace lb

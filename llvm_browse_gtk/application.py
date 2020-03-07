@@ -2,7 +2,6 @@
 
 import argparse
 import llvm_browse as lb
-from .module import Module
 from .options import Options
 from typing import Union, List
 from .ui import UI
@@ -19,17 +18,11 @@ GObject.type_register(GtkSource.View)
 
 
 class Application(Gtk.Application):
-    handle = GObject.Property(
-        type=GObject.TYPE_UINT64,
-        default=0,
-        nick='handle',
-        blurb='Handle to the LLVM module')
-
     module = GObject.Property(
-        type=GObject.GObject,
-        default=None,
+        type=GObject.TYPE_UINT64,
+        default=lb.HANDLE_NULL,
         nick='module',
-        blurb='A module object wrapper')
+        blurb='Handle to the LLVM module')
 
     llvm = GObject.Property(
         type=str,
@@ -48,9 +41,10 @@ class Application(Gtk.Application):
         self.ui: UI = UI(self)
 
     def _reset(self):
-        self.handle = 0
+        if self.module:
+            self.lb_module_free(self.module)
+        self.module = lb.HANDLE_NULL
         self.llvm = ''
-        self.module = None
 
     def do_activate(self) -> bool:
         self.options.load()
@@ -65,51 +59,45 @@ class Application(Gtk.Application):
     # Returns true if the file could be opened
     def action_open(self, file: str) -> bool:
         self.llvm = file
-        self.handle = lb.module_create(file)
-        if not self.handle:
+        self.module = lb.module_create(file)
+        if not self.module:
             self._reset()
         else:
-            self.module = Module(self.handle)
             self.ui.do_open()
-        return bool(self.handle)
+        return bool(self.module)
 
     # Returns true if the file could be closed
-    def action_close(self):
-        if self.handle:
-            lb_module_free(self.handle)
+    def action_close(self) -> bool:
         self._reset()
         return True
 
     # Returns true if the file could be reloaded
-    def action_reload(self):
+    def action_reload(self) -> bool:
         if self.llvm:
-            if not self.action_open(self, self.llvm):
-                self._reset()
-                return False
-            return True
+            llvm = self.llvm
+            self._reset()
+            return self.action_open(self, llvm)
         return False
 
     # Returns true on success. Not sure if this will actually return
     def action_quit(self) -> bool:
-        if self.handle:
-            self.lb_module_free(self.handle)
-            self._reset()
+        self._reset()
         self.remove_window(self.ui.get_application_window())
         return True
 
-    def action_goto_definition(self):
+    def action_goto_definition(self) -> bool:
         pass
 
-    def action_goto_prev_use(self):
+    def action_goto_prev_use(self) -> bool:
         pass
 
-    def action_goto_next_use(self):
+    def action_goto_next_use(self) -> bool:
         pass
 
-    def action_go_back(self):
+    def action_go_back(self) -> bool:
         pass
 
-    def action_go_forward(self):
+    def action_go_forward(self) -> bool:
         pass
 
     def run(self, argv: argparse.Namespace) -> int:

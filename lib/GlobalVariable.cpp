@@ -64,6 +64,11 @@ GlobalVariable::get_full_name() const {
   return llvm::StringRef(full_name);
 }
 
+bool
+GlobalVariable::is_artificial() const {
+	return get_llvm().hasGlobalUnnamedAddr();
+}
+
 bool 
 GlobalVariable::is_mangled() const {
 	if(has_source_name())

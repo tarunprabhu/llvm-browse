@@ -19,6 +19,8 @@ class alignas(ALIGN_OBJ) MDNode :
 public:
   MDNode(llvm::MDNode& llvm, unsigned slot, Module& module);
   virtual ~MDNode() = default;
+
+  bool is_artificial() const;
 };
 
 } // namespace lb

@@ -41,4 +41,13 @@ llvm::StringRef StructType::get_full_name() const {
 	return llvm::StringRef(full_name);
 }
 
+bool StructType::is_artificial() const {
+	// At some point, we may be able to make a distinction between struct types
+	// that are defined by the user (or inherited from other header files) and 
+	// those that are a result of the compiler creating a struct. Off the top 
+	// of my head, I can't think of a case where the latter is true anyway, 
+	// but still, it's something to keep in mind 
+	return false;
+}
+
 } // namespace lb
