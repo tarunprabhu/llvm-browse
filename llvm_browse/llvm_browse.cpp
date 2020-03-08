@@ -3,6 +3,7 @@
 
 #include "lib/Argument.h"
 #include "lib/BasicBlock.h"
+#include "lib/Definition.h"
 #include "lib/Function.h"
 #include "lib/GlobalAlias.h"
 #include "lib/GlobalVariable.h"
@@ -11,6 +12,7 @@
 #include "lib/MDNode.h"
 #include "lib/Module.h"
 #include "lib/StructType.h"
+#include "lib/Use.h"
 
 #include <llvm/ADT/iterator_range.h>
 
@@ -160,18 +162,24 @@ convert(const lb::SourceRange& range) {
   PyObject* py = Py_None;
   if(range) {
     PyObject* py_begin = PyStructSequence_New(PySourcePoint);
-    PyStructSequence_SetItem(py_begin, 0, PyLong_FromLong(range.begin.line));
-    PyStructSequence_SetItem(py_begin, 1, PyLong_FromLong(range.begin.column));
+    PyStructSequence_SetItem(py_begin,
+                             0,
+                             PyLong_FromLong(range.get_begin_line()));
+    PyStructSequence_SetItem(py_begin,
+                             1,
+                             PyLong_FromLong(range.get_begin_column()));
     Py_INCREF(py_begin);
 
     PyObject* py_end = PyStructSequence_New(PySourcePoint);
-    PyStructSequence_SetItem(py_end, 0, PyLong_FromLong(range.end.line));
-    PyStructSequence_SetItem(py_end, 1, PyLong_FromLong(range.end.column));
+    PyStructSequence_SetItem(py_end, 0, PyLong_FromLong(range.get_end_line()));
+    PyStructSequence_SetItem(py_end,
+                             1,
+                             PyLong_FromLong(range.get_end_column()));
     Py_INCREF(py_end);
 
     py = PyStructSequence_New(PySourceRange);
-    if(range.file)
-      PyStructSequence_SetItem(py, 0, PyUnicode_FromString(range.file));
+    if(range.get_file())
+      PyStructSequence_SetItem(py, 0, PyUnicode_FromString(range.get_file()));
     else
       PyStructSequence_SetItem(py, 0, PyUnicode_FromString(""));
     PyStructSequence_SetItem(py, 1, py_begin);
@@ -187,8 +195,30 @@ convert(const lb::LLVMRange& range) {
   PyObject* py = Py_None;
   if(range) {
     py = PyStructSequence_New(PyLLVMRange);
-    PyStructSequence_SetItem(py, 0, PyLong_FromLong(range.begin));
-    PyStructSequence_SetItem(py, 1, PyLong_FromLong(range.end));
+    PyStructSequence_SetItem(py, 0, PyLong_FromLong(range.get_begin()));
+    PyStructSequence_SetItem(py, 1, PyLong_FromLong(range.get_end()));
+  }
+
+  Py_INCREF(py);
+  return py;
+}
+
+static PyObject*
+convert(const lb::Definition& defn) {
+  PyObject* py = Py_None;
+  if(defn) {
+    lb::error() << "UNIMPLEMENTED: convert(Definition)\n";
+  }
+
+  Py_INCREF(py);
+  return py;
+}
+
+static PyObject*
+convert(const lb::Use& use) {
+  PyObject* py = Py_None;
+  if(use) {
+    lb::error() << "UNIMPLEMENTED: convert(Use*)\n";
   }
 
   Py_INCREF(py);
@@ -198,8 +228,8 @@ convert(const lb::LLVMRange& range) {
 static PyObject*
 convert(llvm::iterator_range<lb::INavigable::Iterator> uses) {
   PyObject* list = PyList_New(0);
-  for(const lb::LLVMRange& range : uses)
-    PyList_Append(list, convert(range));
+  for(const lb::Use* use : uses)
+    PyList_Append(list, convert(*use));
 
   Py_INCREF(list);
   return list;

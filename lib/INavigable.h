@@ -6,10 +6,15 @@
 
 #include <llvm/ADT/StringRef.h>
 
+#include "Definition.h"
+#include "Entities.h"
 #include "LLVMRange.h"
 #include "SourceRange.h"
+#include "Use.h"
 
 namespace lb {
+
+class Instruction;
 
 // Base for objects that are navigable. This essentially means that they
 // have a location in the LLVM file that can be reached with a
@@ -27,6 +32,8 @@ namespace lb {
 //
 class INavigable {
 protected:
+  EntityKind kind;
+
   // The tag is the "label" of the entity in the LLVM IR. For instructions, 
   // this might have the form "^%.+$" where the characters after the percent 
   // sign are typically numbers but they don't have to be. 
@@ -42,7 +49,7 @@ protected:
   // that don't return a value, it may cover the instruction opcode although
   // it might be better if it is of length 0 and positioned just at the start
   // of the op code
-  LLVMRange llvm_defn;
+  const Definition* llvm_defn;
 
   // The LLVM span is the range in characters that the entity covers in
   // the IR. For functions, this is the entire body, for basic blocks, all
@@ -70,13 +77,13 @@ protected:
   // but it doesn't make sense to have any uses for them. But it's a bit messy
   // to separate the two and still keep the type system straight (or - and this
   // is more likely - I am being particuarly dense)
-  std::vector<LLVMRange> m_uses;
+  std::vector<const Use*> m_uses;
 
 public:
   using Iterator = decltype(m_uses)::const_iterator;
 
 protected:
-  INavigable() = default;
+  INavigable(EntityKind kind);
 
 public:
   virtual ~INavigable() = default;
@@ -90,13 +97,14 @@ public:
                bool may_need_quotes = true);
   
   void sort_uses();
-  void add_use(const LLVMRange& range);
+  void add_use(const Use&);
 
-  void set_llvm_defn(const LLVMRange& range);
+  void set_llvm_defn(const Definition& defn);
   void set_llvm_span(const LLVMRange& range);
   void set_source_defn(const SourceRange& range);
   void set_source_span(const SourceRange& range);
 
+  EntityKind get_kind() const;
   Iterator begin() const;
   Iterator end() const;
   llvm::iterator_range<Iterator> uses() const;
@@ -107,7 +115,7 @@ public:
   bool has_llvm_span() const;
   bool has_source_defn() const;
   bool has_source_span() const;
-  const LLVMRange& get_llvm_defn() const;
+  const Definition& get_llvm_defn() const;
   const LLVMRange& get_llvm_span() const;
   const SourceRange& get_source_defn() const;
   const SourceRange& get_source_span() const;

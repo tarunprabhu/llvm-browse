@@ -21,6 +21,11 @@ public:
   virtual ~MDNode() = default;
 
   bool is_artificial() const;
+
+public:
+	static bool classof(const INavigable* v) {
+		return v->get_kind() == EntityKind::MDNode;
+	}
 };
 
 } // namespace lb

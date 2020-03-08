@@ -3,11 +3,6 @@
 
 namespace lb {
 
-SourcePoint::SourcePoint(unsigned line, unsigned column) :
-    line(line), column(column) {
-  ;
-}
-
 SourceRange::SourceRange() : file(nullptr), begin(0, 0), end(0, 0) {
   ;
 }
@@ -25,6 +20,34 @@ SourceRange::SourceRange(const char* file,
     file(file),
     begin({begin_line, begin_column}), end({end_line, end_column}) {
   ;
+}
+
+const char* SourceRange::get_file() const {
+  return file;
+}
+
+const SourcePoint& SourceRange::get_begin() const {
+  return begin;
+}
+
+unsigned SourceRange::get_begin_line() const {
+  return get_begin().get_line();
+}
+
+unsigned SourceRange::get_begin_column() const {
+  return get_begin().get_column();
+}
+
+const SourcePoint& SourceRange::get_end() const {
+  return end;
+}
+
+unsigned SourceRange::get_end_line() const {
+  return get_end().get_line();
+}
+
+unsigned SourceRange::get_end_column() const {
+  return get_end().get_column();
 }
 
 } // namespace lb

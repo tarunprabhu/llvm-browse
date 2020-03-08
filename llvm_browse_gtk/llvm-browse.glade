@@ -464,6 +464,21 @@
   <object class="GtkRecentManager" id="rmgr_main">
     <property name="filename">/home/tarun/.local/share/recently-used.xbel</property>
   </object>
+  <object class="GtkSourceView" id="srcvw_llvm_unused">
+    <property name="visible">True</property>
+    <property name="can_focus">True</property>
+    <property name="hexpand">True</property>
+    <property name="vexpand">True</property>
+    <property name="editable">False</property>
+    <property name="left_margin">2</property>
+    <property name="right_margin">2</property>
+    <property name="monospace">True</property>
+    <property name="tab_width">4</property>
+    <property name="smart_home_end">before</property>
+    <property name="highlight_current_line">True</property>
+    <property name="indent_on_tab">False</property>
+    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
+  </object>
   <object class="GtkTreeStore" id="trst_contents">
     <columns>
       <!-- column-name Entity -->
@@ -486,6 +501,7 @@
   <object class="GtkTreeModelSort" id="trsrt_contents">
     <property name="model">trfltr_contents</property>
   </object>
+  <object class="GtkTextBuffer" id="txtbuf_llvm"/>
   <object class="GtkApplicationWindow" id="win_main">
     <property name="can_focus">False</property>
     <property name="default_width">660</property>
@@ -1125,20 +1141,11 @@
                                 <property name="vexpand">True</property>
                                 <property name="shadow_type">in</property>
                                 <child>
-                                  <object class="GtkSourceView" id="srcvw_llvm">
+                                  <object class="GtkTextView" id="srcvw_llvm">
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
-                                    <property name="hexpand">True</property>
-                                    <property name="vexpand">True</property>
                                     <property name="editable">False</property>
-                                    <property name="left_margin">2</property>
-                                    <property name="right_margin">2</property>
-                                    <property name="monospace">True</property>
-                                    <property name="tab_width">4</property>
-                                    <property name="smart_home_end">before</property>
-                                    <property name="highlight_current_line">True</property>
-                                    <property name="indent_on_tab">False</property>
-                                    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
+                                    <property name="buffer">txtbuf_llvm</property>
                                   </object>
                                 </child>
                               </object>

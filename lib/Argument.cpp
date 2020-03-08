@@ -11,8 +11,9 @@ using llvm::isa;
 namespace lb {
 
 Argument::Argument(llvm::Argument& arg, Function& f, Module& module) :
-    Value(Value::Kind::Argument),
-    INavigable(), IWrapper<llvm::Argument>(arg, module), di(nullptr) {
+    Value(EntityKind::Argument),
+    INavigable(EntityKind::Argument), IWrapper<llvm::Argument>(arg, module),
+    di(nullptr) {
   ;
 }
 

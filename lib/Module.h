@@ -45,6 +45,8 @@ protected:
   std::vector<std::unique_ptr<Value>> value_ptrs;
   std::vector<std::unique_ptr<MDNode>> mdnode_ptrs;
   std::vector<std::unique_ptr<StructType>> struct_ptrs;
+  std::vector<std::unique_ptr<Use>> use_ptrs;
+  std::vector<std::unique_ptr<Definition>> def_ptrs;
   std::unique_ptr<llvm::MemoryBuffer> buffer;
 
   // When looking up anything, these will be actually returned
@@ -55,10 +57,29 @@ protected:
   std::vector<const MDNode*> m_metadata;
   std::vector<const StructType*> m_structs;
 
+  // Wrapper lookup maps
   std::map<const llvm::Comdat*, Comdat*> cmap;
   std::map<const llvm::MDNode*, MDNode*> mmap;
   std::map<llvm::StructType*, StructType*> tmap;
   std::map<const llvm::Value*, Value*> vmap;
+
+  // Navigation maps
+
+  // FIXME: It's really stupid to have copies of the vectors with raw pointers
+  // instead of the unique_ptrs. Really should fix it at some point
+
+  // The uses are guaranteed not to overlap and are sorted in the order in 
+  // which they appear in the IR
+  std::vector<const Use*> uses;
+
+  // These are the definitions of the Navigable entities in the IR. 
+  // These are guaranteed not to overlap and are sorted in the order in 
+  // which they appear in the IR 
+  std::vector<const Definition*> defns;
+
+  // There are the functions in the module and are sorted 
+  // in order of appearance in the IR.
+  std::vector<const Function*> func_spans;
 
 public:
   using AliasIterator    = decltype(m_aliases)::const_iterator;
@@ -104,7 +125,11 @@ protected:
     return *ptr;
   }
 
-  bool check_range(const LLVMRange& range, llvm::StringRef tag) const;
+  void sort_uses();
+  void sort_definitions();
+  void sort_func_spans();
+
+  bool check_range(uint64_t begin, uint64_t end, llvm::StringRef tag) const;
   bool check_uses(const INavigable& navigable) const;
   bool check_navigable(const INavigable& navigable) const;
 
@@ -129,6 +154,12 @@ public:
   Instruction& add(llvm::Instruction& llvm, Function& f);
   MDNode& add(llvm::MDNode& llvm, unsigned slot);
   StructType& add(llvm::StructType* llvm);
+  Use& add_use(uint64_t begin,
+               uint64_t end,
+               const INavigable& value,
+               const Instruction* inst = nullptr);
+  Definition&
+  add_definition(uint64_t begin, uint64_t end, const INavigable& defined);
 
   Argument& get(const llvm::Argument& llvm);
   BasicBlock& get(const llvm::BasicBlock& llvm);
@@ -166,6 +197,12 @@ public:
   unsigned get_num_metadata() const;
   unsigned get_num_structs() const;
 
+  const Use* get_use_at(uint64_t offset) const;
+  const Definition* get_definition_at(uint64_t offset) const;
+  const Instruction* get_instruction_at(uint64_t offset) const;
+  const BasicBlock* get_block_at(uint64_t offset) const;
+  const Function* get_function_at(uint64_t offset) const;
+
   llvm::Module& get_llvm();
   const llvm::Module& get_llvm() const;
 
@@ -177,7 +214,7 @@ public:
   }
 
 public:
-  static std::unique_ptr<Module> create(const std::string& file);
+  static std::unique_ptr<const Module> create(const std::string& file);
 };
 
 } // namespace lb

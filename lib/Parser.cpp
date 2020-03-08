@@ -244,7 +244,15 @@ Parser::overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped) {
 }
 
 std::map<INavigable*, size_t>
-Parser::associate_values(std::vector<INavigable*> values, size_t cursor) {
+Parser::associate_values(std::vector<INavigable*> values,
+                         Module& module,
+                         size_t cursor,
+                         Instruction* inst) {
+  // The list of values provided here are typically the operands in a
+  // LLVM::Instruction or llvm::ConstantExpr. We need to find the corresponding
+  // tag for each value in the text and associate the value with that piece
+  // of text
+
   sort_by_tag_name(values);
   std::map<INavigable*, size_t> mapped;
   for(INavigable* v : values) {
@@ -253,7 +261,7 @@ Parser::associate_values(std::vector<INavigable*> values, size_t cursor) {
     while(overlaps(pos, mapped))
       pos = find(tag, pos + 1, Lookback::Whitespace, false);
     mapped[v] = pos;
-    v->add_use(LLVMRange(pos, pos + v->get_tag().size()));
+    v->add_use(module.add_use(pos, pos + v->get_tag().size(), *v, inst));
   }
 
   return mapped;
@@ -321,7 +329,8 @@ Parser::link(Module& module) {
     if(llvm_sty->hasName()) {
       StructType& sty = module.add(llvm_sty);
       size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
-      sty.set_llvm_defn(LLVMRange(pos, pos + sty.get_tag().size()));
+      sty.set_llvm_defn(
+          module.add_definition(pos, pos + sty.get_tag().size(), sty));
     } else {
       warning() << "Skipping unnamed struct type: " << llvm_sty << "\n";
     }
@@ -340,8 +349,8 @@ Parser::link(Module& module) {
       if(pos == llvm::StringRef::npos)
         critical() << "Could not find comdat definition: " << c.get_tag()
                    << "\n";
-      else
-        c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+      // else
+      //   c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
     }
   }
   for(llvm::GlobalVariable& g : llvm.globals()) {
@@ -351,8 +360,8 @@ Parser::link(Module& module) {
       if(pos == llvm::StringRef::npos)
         critical() << "Could not find comdat definition: " << c.get_tag()
                    << "\n";
-      else
-        c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+      // else
+      //   c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
     }
   }
 
@@ -368,10 +377,10 @@ Parser::link(Module& module) {
         critical() << "Could not find global definition: " << g.get_tag()
                    << "\n";
       } else {
-        LLVMRange defn(pos, pos + g.get_tag().size());
-        g.set_llvm_defn(defn);
-        if(llvm::Comdat* c = llvm_g.getComdat()) 
-          module.get(*c).set_llvm_defn(defn);
+        uint64_t end = pos + g.get_tag().size();
+        g.set_llvm_defn(module.add_definition(pos, end, g));
+        // if(llvm::Comdat* c = llvm_g.getComdat())
+        //   module.get(*c).set_llvm_defn(module.add_definition(pos, end, *c));
       }
 
       // FIXME: Skipping any metadata on global variables because I can't
@@ -390,7 +399,7 @@ Parser::link(Module& module) {
     if(pos == llvm::StringRef::npos)
       critical() << "Could not find alias definition: " << a.get_tag() << "\n";
     else
-      a.set_llvm_defn(LLVMRange(pos, pos + a.get_tag().size()));
+      a.set_llvm_defn(module.add_definition(pos, pos + a.get_tag().size(), a));
   }
 
   // Do this in two passes because there may be circular references
@@ -403,10 +412,10 @@ Parser::link(Module& module) {
       critical() << "Could not find function definition: " << f.get_tag()
                  << "\n";
     } else {
-      LLVMRange defn(pos, pos + f.get_tag().size());
-      f.set_llvm_defn(defn);
-      if(llvm::Comdat* c = llvm_f.getComdat())
-        module.get(*c).set_llvm_defn(defn);
+      uint64_t end = pos + f.get_tag().size();
+      f.set_llvm_defn(module.add_definition(pos, end, f));
+      // if(llvm::Comdat* c = llvm_f.getComdat())
+      //   module.get(*c).set_llvm_defn(defn);
     }
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
@@ -422,7 +431,8 @@ Parser::link(Module& module) {
       critical() << "Could not find metadata definition: " << md.get_tag()
                  << "\n";
     else
-      md.set_llvm_defn(LLVMRange(pos, pos + md.get_tag().size()));
+      md.set_llvm_defn(
+          module.add_definition(pos, pos + md.get_tag().size(), md));
   }
 
   message() << "Processing global variables\n";
@@ -432,7 +442,8 @@ Parser::link(Module& module) {
       GlobalVariable& g = module.get(llvm_g);
       if(llvm_g.hasInitializer())
         associate_values(collect_constants(llvm_g.getInitializer(), module),
-                         g.get_llvm_defn().end);
+                         module,
+                         g.get_llvm_defn().get_end());
     }
   }
 
@@ -445,7 +456,7 @@ Parser::link(Module& module) {
     Function& f = module.get(llvm_f);
     // Reposition the cursor at the function definition because we know that
     // things will  be closer
-    cursor = f.get_llvm_defn().end;
+    cursor = f.get_llvm_defn().get_end();
     local_slots->incorporateFunction(llvm_f);
     size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
     for(llvm::Argument& llvm_arg : llvm_f.args()) {
@@ -507,9 +518,10 @@ Parser::link(Module& module) {
 
         size_t i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
         if(llvm_inst.getType()->isVoidTy())
-          inst.set_llvm_defn(LLVMRange(i_begin, i_begin));
+          inst.set_llvm_defn(module.add_definition(i_begin, i_begin, inst));
         else
-          inst.set_llvm_defn(LLVMRange(i_begin, i_begin + tag.size()));
+          inst.set_llvm_defn(
+              module.add_definition(i_begin, i_begin + tag.size(), inst));
 
         // Because we don't want to even try to parse the instruction operands,
         // everything will have to be text-based matching. To reduce the
@@ -556,7 +568,7 @@ Parser::link(Module& module) {
         }
 
         std::map<INavigable*, size_t> mapped
-            = associate_values(std::move(ops), i_begin);
+            = associate_values(std::move(ops), module, i_begin, &inst);
       }
 
       // There isn't a reasonable way to find the start of a basic block
@@ -567,7 +579,7 @@ Parser::link(Module& module) {
       // definition of a basic block other than to the start of the first
       // instruction
       size_t bb_begin
-          = module.get(llvm_bb.front()).get_llvm_defn().begin;
+          = module.get(llvm_bb.front()).get_llvm_defn().get_begin();
       bb.set_llvm_span(LLVMRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
@@ -592,11 +604,16 @@ Parser::link(Module& module) {
 
       if(bb_end != llvm::StringRef::npos)
         bb.set_llvm_span(LLVMRange(bb_begin, bb_end));
+      else
+        warning() << "Could not compute span for basic block\n";
     }
 
-    size_t f_end = module.get(llvm_f.back()).get_llvm_defn().end;
+    size_t f_end = module.get(llvm_f.back()).get_llvm_defn().get_end();
     if(f_end != llvm::StringRef::npos)
       f.set_llvm_span(LLVMRange(f_begin, f_end + 1));
+    else
+      warning() << "Could not compute span for function: "
+                << f.get_llvm().getName() << "\n";
   }
 
   message() << "Processing metadata\n";
@@ -629,7 +646,7 @@ Parser::link(Module& module) {
   sort_by_tag_name(mds);
   for(MDNode* md : mds) {
     const llvm::MDNode& llvm_md = md->get_llvm();
-    cursor                      = md->get_llvm_defn().end;
+    cursor                      = md->get_llvm_defn().get_end();
     for(unsigned i = 0; i < llvm_md.getNumOperands(); i++) {
       if(const auto* mop
          = dyn_cast_or_null<llvm::MDNode>(llvm_md.getOperand(i))) {
@@ -642,13 +659,15 @@ Parser::link(Module& module) {
           ss << "}";
         size_t pos = find_and_move(ss.str(), Lookback::Any, cursor);
         if(pos != llvm::StringRef::npos)
-          op.add_use(LLVMRange(pos, pos + op.get_tag().size()));
+          op.add_use(module.add_use(pos, pos + op.get_tag().size(), op));
         else
           warning() << "Could not find metadata operand: " << op.get_tag()
                     << "\n";
       }
     }
   }
+
+  message() << "Done parsing IR\n";
 
   return true;
 }

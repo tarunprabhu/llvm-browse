@@ -6,7 +6,8 @@
 namespace lb {
 
 StructType::StructType(llvm::StructType* llvm, Module& module) :
-    INavigable(), IWrapper<llvm::StructType*>(llvm, module) {
+    INavigable(EntityKind::StructType), IWrapper<llvm::StructType*>(llvm,
+                                                                    module) {
   if(llvm->hasName())
     set_tag(llvm->getName(), "%");
   else

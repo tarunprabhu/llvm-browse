@@ -15,8 +15,8 @@ using llvm::isa;
 namespace lb {
 
 Function::Function(llvm::Function& llvm_f, Module& module) :
-    Value(Value::Kind::Function),
-    INavigable(), IWrapper<llvm::Function>(llvm_f, module), comdat(nullptr),
+    Value(EntityKind::Function),
+    INavigable(EntityKind::Function), IWrapper<llvm::Function>(llvm_f, module), comdat(nullptr),
     di(llvm_f.getSubprogram()) {
   set_tag(llvm_f.getName(), "@");
   for(llvm::Argument& arg : llvm_f.args())

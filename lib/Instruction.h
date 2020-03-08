@@ -45,7 +45,11 @@ public:
 
 public:
   static bool classof(const Value* v) {
-    return v->get_kind() == Value::Kind::Instruction;
+    return v->get_kind() == EntityKind::Instruction;
+  }
+
+  static bool classof(const INavigable* v) {
+    return v->get_kind() == EntityKind::Instruction;
   }
 };
 

@@ -26,7 +26,11 @@ public:
 
 public:
   static bool classof(const Value* v) {
-    return v->get_kind() == Value::Kind::GlobalAlias;
+    return v->get_kind() == EntityKind::GlobalAlias;
+  }
+
+  static bool classof(const INavigable* v) {
+  	return v->get_kind() == EntityKind::GlobalAlias;
   }
 };
 

@@ -196,7 +196,7 @@ class UI(GObject.GObject):
         return self.builder.get_object(name)
 
     def _init_widgets(self):
-        self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
+        # self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
         self.trsrt_contents.set_sort_func(1, self.fn_contents_sort_names)
         self.trfltr_contents.set_visible_func(self.fn_contents_filter_names)
         self['fbtn_options_code'].set_filter_func(UI.fn_font_filter)
@@ -225,9 +225,13 @@ class UI(GObject.GObject):
                               dst_prop, bidirectional, invert)
 
         bind('font', self['fbtn_options_code'], 'font-desc')
-        bind('style', self['srcvw_llvm'].get_buffer(), 'style-scheme')
+        # FIXME: We don't use a GtkSource.View for the LLVM because when 
+        # opening a large LLVM (100MB+) file, it becomes too slow to be usable. 
+        # At some point, I'll switch to a custom text view that may be able 
+        # to handle large files like that reasonably
+        # bind('style', self['srcvw_llvm'].get_buffer(), 'style-scheme')
+        # bind('line-nums-llvm', self['srcvw_llvm'], 'show-line-numbers')
         bind('style', self['srcstyl_options_code'], 'style-scheme')
-        bind('line-nums-llvm', self['srcvw_llvm'], 'show-line-numbers')
         bind('line-nums-llvm', self['chk_options_lines_llvm'], 'active')
         bind('line-nums-source', self['srcvw_source'], 'show-line-numbers')
         bind('line-nums-source', self['chk_options_lines_source'], 'active')
@@ -476,7 +480,7 @@ class UI(GObject.GObject):
         self.srcbuf_llvm.set_text(lb.module_get_code(self.app.module))
 
         self.do_populate_contents()
-        self.do_compute_tags()
+        # self.do_compute_tags()
 
     def do_goto_definition(self, use_tag: UseTag):
         pass

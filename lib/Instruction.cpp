@@ -17,8 +17,8 @@ using llvm::isa;
 namespace lb {
 
 Instruction::Instruction(llvm::Instruction& llvm_i, Function& f, Module& module) :
-    Value(Value::Kind::Instruction),
-    INavigable(), IWrapper<llvm::Instruction>(llvm_i, module),
+    Value(EntityKind::Instruction),
+    INavigable(EntityKind::Instruction), IWrapper<llvm::Instruction>(llvm_i, module),
     di(llvm_i.getDebugLoc()) {
   if(const llvm::DebugLoc& loc = llvm_i.getDebugLoc()) {
     if(const auto* scope = dyn_cast<llvm::DIScope>(loc.getScope())) {

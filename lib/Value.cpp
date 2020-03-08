@@ -3,12 +3,11 @@
 
 namespace lb {
 
-Value::Value(Value::Kind kind) :
-    kind(kind) {
+Value::Value(EntityKind kind) : kind(kind) {
   ;
 }
 
-Value::Kind
+EntityKind
 Value::get_kind() const {
   return kind;
 }

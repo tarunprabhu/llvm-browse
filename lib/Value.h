@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "Entities.h"
 #include "IWrapper.h"
 
 namespace lb {
@@ -14,27 +15,16 @@ namespace lb {
 class Module;
 
 class Value {
-public:
-  enum class Kind {
-    Argument = 1,
-    BasicBlock,
-    Constant,
-    Function,
-    GlobalAlias,
-    GlobalVariable,
-    Instruction,
-  };
+protected:
+  EntityKind kind;
 
 protected:
-  Kind kind;
-
-protected:
-  Value(Kind kind);
+  Value(EntityKind kind);
 
 public:
   virtual ~Value() = default;
 
-  Kind get_kind() const;
+  EntityKind get_kind() const;
 };
 
 } // namespace lb

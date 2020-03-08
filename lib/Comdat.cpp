@@ -14,7 +14,7 @@ namespace lb {
 Comdat::Comdat(llvm::Comdat& llvm_c,
                llvm::GlobalObject& target,
                Module& module) :
-    INavigable(),
+    INavigable(EntityKind::Comdat),
     IWrapper<llvm::Comdat>(llvm_c, module), target(target) {
   set_tag(llvm_c.getName(), "$");
 }	

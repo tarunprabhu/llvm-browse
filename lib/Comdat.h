@@ -41,6 +41,11 @@ public:
   const Value& get_target() const;
   template<typename T>
   const T& get_target_as() const;
+
+public:
+	static bool classof(INavigable* v) {
+		return v->get_kind() == EntityKind::Comdat;
+	}
 };
 
 } // namespace lb

@@ -15,8 +15,9 @@ using llvm::isa;
 namespace lb {
 
 GlobalVariable::GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module) :
-    Value(Value::Kind::GlobalVariable),
-    INavigable(), IWrapper<llvm::GlobalVariable>(llvm_g, module),
+    Value(EntityKind::GlobalVariable),
+    INavigable(EntityKind::GlobalVariable), IWrapper<llvm::GlobalVariable>(
+                                                llvm_g, module),
     comdat(nullptr), di(nullptr) {
   if(llvm_g.hasName())
     set_tag(llvm_g.getName(), "@");

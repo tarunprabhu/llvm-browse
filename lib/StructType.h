@@ -34,6 +34,11 @@ public:
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
   bool is_artificial() const;
+
+public:
+	static bool classof(const INavigable* v) {
+		return v->get_kind() == EntityKind::StructType;
+	}
 };
 
 } // namespace lb

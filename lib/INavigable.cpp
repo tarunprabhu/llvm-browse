@@ -11,18 +11,26 @@ needs_quotes(llvm::StringRef str) {
   return false;
 }
 
-void
-INavigable::sort_uses() {
-  std::sort(m_uses.begin(),
-            m_uses.end(),
-            [](const LLVMRange& l, const LLVMRange& r) {
-              return ((l.begin < r.begin) and (l.end < r.end));
-            });
+INavigable::INavigable(EntityKind kind) : kind(kind), llvm_defn(nullptr) {
+  ;
+}
+
+EntityKind INavigable::get_kind() const {
+  return kind;
 }
 
 void
-INavigable::add_use(const LLVMRange& range) {
-  m_uses.emplace_back(range);
+INavigable::sort_uses() {
+  std::sort(m_uses.begin(), m_uses.end(), [](const Use* l, const Use* r) {
+    // Uses are guaranteed not to overlap with any other uses, so we only need
+    // to look at the beginning to keep them sorted
+    return l->get_begin() < r->get_begin();
+  });
+}
+
+void
+INavigable::add_use(const Use& use) {
+  m_uses.emplace_back(&use);
 }
 
 void
@@ -46,8 +54,8 @@ INavigable::set_tag(llvm::StringRef name,
 }
 
 void
-INavigable::set_llvm_defn(const LLVMRange& range) {
-  llvm_defn = range;
+INavigable::set_llvm_defn(const Definition& defn) {
+  llvm_defn = &defn;
 }
 
 void
@@ -111,9 +119,9 @@ bool INavigable::has_source_span() const {
   return source_span;
 }
 
-const LLVMRange&
+const Definition&
 INavigable::get_llvm_defn() const {
-  return llvm_defn;
+  return *llvm_defn;
 }
 
 const LLVMRange&

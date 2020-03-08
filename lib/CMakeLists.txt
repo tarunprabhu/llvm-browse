@@ -2,6 +2,7 @@ set(SOURCES
   Argument.cpp
   BasicBlock.cpp
   Comdat.cpp
+  Definition.cpp
   DIUtils.cpp
   Function.cpp
   GlobalAlias.cpp
@@ -13,9 +14,11 @@ set(SOURCES
   LLVMRange.cpp
   Logging.cpp
   Parser.cpp
+  SourcePoint.cpp
   SourceRange.cpp
   String.cpp
   StructType.cpp
+  Use.cpp
   Value.cpp)
 
 add_library(${LIB_LLVM_BROWSE_LIB} SHARED

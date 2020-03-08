@@ -14,9 +14,9 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
-using llvm::isa;
 using llvm::cast;
 using llvm::dyn_cast;
+using llvm::isa;
 
 namespace lb {
 
@@ -24,8 +24,7 @@ Module::Module(std::unique_ptr<llvm::Module> module,
                std::unique_ptr<llvm::LLVMContext> context,
                std::unique_ptr<llvm::MemoryBuffer> mbuf) :
     context(std::move(context)),
-    llvm(std::move(module)),
-    buffer(std::move(mbuf)) {
+    llvm(std::move(module)), buffer(std::move(mbuf)) {
   ;
 }
 
@@ -62,6 +61,7 @@ Function&
 Module::add(llvm::Function& llvm) {
   Function& f = add<Function>(llvm);
   m_functions.push_back(&f);
+  func_spans.push_back(&f);
   return f;
 }
 
@@ -100,6 +100,27 @@ Module::add(llvm::StructType* llvm) {
   m_structs.push_back(ptr);
   tmap[llvm] = ptr;
   return *ptr;
+}
+
+Use&
+Module::add_use(uint64_t begin,
+                uint64_t end,
+                const INavigable& value,
+                const Instruction* inst) {
+  Use* use = new Use(begin, end, value, inst);
+  use_ptrs.emplace_back(use);
+  uses.push_back(use);
+  return *use;
+}
+
+Definition&
+Module::add_definition(uint64_t begin,
+                       uint64_t end,
+                       const INavigable& defined) {
+  Definition* defn = new Definition(begin, end, defined);
+  def_ptrs.emplace_back(defn);
+  defns.push_back(defn);
+  return *defn;
 }
 
 StructType&
@@ -242,28 +263,206 @@ Module::structs() const {
   return llvm::iterator_range<StructIterator>(m_structs);
 }
 
-unsigned Module::get_num_aliases() const {
+unsigned
+Module::get_num_aliases() const {
   return m_aliases.size();
 }
 
-unsigned Module::get_num_comdats() const {
+unsigned
+Module::get_num_comdats() const {
   return m_comdats.size();
 }
 
-unsigned Module::get_num_functions() const {
+unsigned
+Module::get_num_functions() const {
   return m_functions.size();
 }
 
-unsigned Module::get_num_globals() const {
+unsigned
+Module::get_num_globals() const {
   return m_globals.size();
 }
 
-unsigned Module::get_num_metadata() const {
+unsigned
+Module::get_num_metadata() const {
   return m_metadata.size();
 }
 
-unsigned Module::get_num_structs() const {
+unsigned
+Module::get_num_structs() const {
   return m_structs.size();
+}
+
+template<typename T,
+         std::enable_if_t<!std::is_base_of<INavigable, T>::value, int> = 0>
+static uint64_t
+get_offset_begin(const T* ptr) {
+  return ptr->get_begin();
+}
+
+static uint64_t
+get_offset_begin(const INavigable* v) {
+  return v->get_llvm_span().get_begin();
+}
+
+template<typename T,
+         std::enable_if_t<!std::is_base_of<INavigable, T>::value, int> = 0>
+static uint64_t
+get_offset_end(const T* ptr) {
+  return ptr->get_end();
+}
+
+static uint64_t
+get_offset_end(const INavigable* v) {
+  return v->get_llvm_span().get_end();
+}
+
+template<typename T>
+static const T*
+bin_search(uint64_t offset,
+           const std::vector<const T*>& vec,
+           unsigned left,
+           unsigned right) {
+  if(left > right)
+    return nullptr;
+
+  unsigned mid   = std::floor(left + right) / 2;
+  uint64_t begin = get_offset_begin(vec[mid]);
+  uint64_t end   = get_offset_end(vec[mid]);
+
+  if(offset < begin)
+    return bin_search(offset, vec, 0, mid - 1);
+  else if(offset > end)
+    return bin_search(offset, vec, mid + 1, right);
+  else
+    return vec[mid];
+}
+
+template<typename T>
+static const T*
+bin_search(uint64_t offset, const std::vector<const T*>& vec) {
+  return bin_search(offset, vec, 0, vec.size() - 1);
+}
+
+const Use*
+Module::get_use_at(uint64_t offset) const {
+  if(not offset)
+    return nullptr;
+
+  return bin_search(offset, uses);
+}
+
+const Definition*
+Module::get_definition_at(uint64_t offset) const {
+  if(not offset)
+    return nullptr;
+
+  return bin_search(offset, defns);
+}
+
+const Instruction*
+Module::get_instruction_at(uint64_t offset) const {
+  if(not offset)
+    return nullptr;
+
+  // Just do a linear search for the instructions because the functions
+  // won't be large enough to warrant the extra memory cost of keeping all
+  // the instructions in sorted order
+  if(const Function* f = get_function_at(offset))
+    for(const BasicBlock* bb : f->blocks())
+      for(const Instruction* inst : bb->instructions())
+        if(const LLVMRange& span = inst->get_llvm_span())
+          if((offset >= span.get_begin()) and (offset <= span.get_end()))
+            return inst;
+
+  return nullptr;
+}
+
+const BasicBlock*
+Module::get_block_at(uint64_t offset) const {
+  if(not offset)
+    return nullptr;
+
+  // Just do a linear search for the basic blocks because the functions
+  // won't be large enough to warrant the extra memory cost of keeping all
+  // the basic blocks in sorted order
+  if(const Function* f = get_function_at(offset))
+    for(const BasicBlock* bb : f->blocks())
+      if(const LLVMRange& span = bb->get_llvm_span())
+        if((offset >= span.get_begin()) and (offset <= span.get_end()))
+          return bb;
+  return nullptr;
+}
+
+const Function*
+Module::get_function_at(uint64_t offset) const {
+  if(not offset)
+    return nullptr;
+
+  return bin_search(offset, func_spans);
+}
+
+void
+Module::sort_uses() {
+  message() << "Sorting all uses\n";
+
+  std::sort(uses.begin(),
+            uses.end(),
+            [](const Use* l, const Use* r) {
+              return l->get_begin() < r->get_begin();
+            });
+
+  message() << "Sort entity uses\n";
+  for(auto& i : vmap) {
+    Value* v = i.second;
+    if(auto* f = dyn_cast<Function>(v))
+      f->sort_uses();
+    else if(auto* arg = dyn_cast<Argument>(v))
+      arg->sort_uses();
+    else if(auto* bb = dyn_cast<BasicBlock>(v))
+      bb->sort_uses();
+    else if(auto* inst = dyn_cast<Instruction>(v))
+      inst->sort_uses();
+    else if(auto* alias = dyn_cast<GlobalAlias>(v))
+      alias->sort_uses();
+    else if(auto* g = dyn_cast<GlobalVariable>(v))
+      g->sort_uses();
+  }
+  for(auto& i : tmap)
+    i.second->sort_uses();
+  for(auto& i : mmap)
+    i.second->sort_uses();
+
+  // First
+}
+
+void
+Module::sort_definitions() {
+  message() << "Sorting definitions\n";
+
+  std::sort(defns.begin(),
+            defns.end(),
+            [](const Definition* l,
+               const Definition* r) {
+              return l->get_begin() < r->get_begin();
+            });
+}
+
+void
+Module::sort_func_spans() {
+  message() << "Sorting function spans\n";
+
+  // Remove any functions that don't have a span.
+  std::remove_if(func_spans.begin(),
+                 func_spans.end(),
+                 [](const Function* f) { return not f->get_llvm_span(); });
+
+  std::sort(func_spans.begin(),
+            func_spans.end(),
+            [](const Function* l, const Function* r) {
+              return l->get_llvm_span().get_begin()
+                     < r->get_llvm_span().get_begin();
+            });
 }
 
 llvm::Module&
@@ -277,22 +476,17 @@ Module::get_llvm() const {
 }
 
 bool
-Module::check_range(const LLVMRange& range, llvm::StringRef tag) const {
-  uint64_t begin          = range.begin;
-  uint64_t end            = range.end;
-  llvm::StringRef slice   = get_code().substr(begin, end - begin);
-  if(slice != tag)
-    return false;
-  return true;
+Module::check_range(uint64_t begin, uint64_t end, llvm::StringRef tag) const {
+  return get_code().substr(begin, end - begin) == tag;
 }
 
 bool
 Module::check_navigable(const INavigable& n) const {
   llvm::StringRef tag = n.get_tag();
-  if(const LLVMRange& range = n.get_llvm_defn()) {
-    if(not check_range(range, tag)) {
-      uint64_t begin = range.begin;
-      uint64_t end   = range.end;
+  if(const Definition& defn = n.get_llvm_defn()) {
+    uint64_t begin = defn.get_begin();
+    uint64_t end   = defn.get_end();
+    if(not check_range(begin, end, tag)) {
       critical() << "Definition mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << tag << endl
@@ -309,11 +503,10 @@ Module::check_navigable(const INavigable& n) const {
 
 bool
 Module::check_uses(const INavigable& n) const {
-  for(const LLVMRange& use : n.uses()) {
-    if(not check_range(use, n.get_tag())) {
-      uint64_t begin = use.begin;
-      size_t end   = use.end;
-
+  for(const Use* use : n.uses()) {
+    uint64_t begin = use->get_begin();
+    uint64_t end   = use->get_end();
+    if(not check_range(begin, end, n.get_tag())) {
       critical() << "Use mismatch" << endl
                  << "  Range:    " << begin << ", " << end << endl
                  << "  Expected: " << n.get_tag() << endl
@@ -393,7 +586,7 @@ Module::check_all(bool check_metadata) const {
   return true;
 }
 
-std::unique_ptr<Module>
+std::unique_ptr<const Module>
 Module::create(const std::string& file) {
   std::unique_ptr<Module> module(nullptr);
   std::unique_ptr<llvm::LLVMContext> context(new llvm::LLVMContext());
@@ -421,26 +614,9 @@ Module::create(const std::string& file) {
             new Module(std::move(llvm), std::move(context), std::move(mbuf)));
         parser.link(*module);
 
-        // Sort the uses because it makes it easier when jumping around 
-        for(auto& i : module->vmap) {
-          Value* v = i.second;
-          if(auto* f = dyn_cast<Function>(v))
-            f->sort_uses();
-          else if(auto* arg = dyn_cast<Argument>(v))
-            arg->sort_uses();
-          else if(auto* bb = dyn_cast<BasicBlock>(v))
-            bb->sort_uses();
-          else if(auto* inst = dyn_cast<Instruction>(v))
-            inst->sort_uses();
-          else if(auto* alias = dyn_cast<GlobalAlias>(v))
-            alias->sort_uses();
-          else if(auto* g = dyn_cast<GlobalVariable>(v))
-            g->sort_uses();
-        }
-        for(auto& i : module->tmap)
-          i.second->sort_uses();
-        for(auto& i : module->mmap)
-          i.second->sort_uses();
+        module->sort_uses();
+        module->sort_definitions();
+        module->sort_func_spans();
       }
     } else {
       critical() << "Could not find LLVM bitcode or IR\n";

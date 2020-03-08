@@ -11,6 +11,7 @@
 
 namespace lb {
 
+class Instruction;
 class Module;
 class INavigable;
 class Value;
@@ -60,9 +61,14 @@ protected:
   // in the map
   bool overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped);
 
-  // Associate the values with uses starting at the cursor
+  // Associate the values with uses starting at the cursor. An optional 
+  // instruction argument associates the uses with the parent instruction 
+  // if any
   std::map<INavigable*, size_t>
-  associate_values(std::vector<INavigable*> values, size_t cursor);
+  associate_values(std::vector<INavigable*> values,
+                   Module& module,
+                   size_t cursor,
+                   Instruction* inst = nullptr);
 
   size_t find(llvm::StringRef key,
               size_t cursor,
