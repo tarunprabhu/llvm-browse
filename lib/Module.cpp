@@ -14,6 +14,10 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
+using llvm::isa;
+using llvm::cast;
+using llvm::dyn_cast;
+
 namespace lb {
 
 Module::Module(std::unique_ptr<llvm::Module> module,
@@ -45,6 +49,15 @@ Module::add(llvm::BasicBlock& llvm, Function& f) {
   return add<BasicBlock>(llvm, f);
 }
 
+Comdat&
+Module::add(llvm::Comdat& llvm, llvm::GlobalObject& g) {
+  auto* ptr = new Comdat(llvm, g, *this);
+  comdat_ptrs.emplace_back(ptr);
+  m_comdats.push_back(ptr);
+  cmap[&llvm] = ptr;
+  return *ptr;
+}
+
 Function&
 Module::add(llvm::Function& llvm) {
   Function& f = add<Function>(llvm);
@@ -74,7 +87,7 @@ Module::add(llvm::Instruction& llvm, Function& f) {
 MDNode&
 Module::add(llvm::MDNode& llvm, unsigned slot) {
   auto* ptr = new MDNode(llvm, slot, *this);
-  mds.emplace_back(ptr);
+  mdnode_ptrs.emplace_back(ptr);
   m_metadata.push_back(ptr);
   mmap[&llvm] = ptr;
   return *ptr;
@@ -83,7 +96,7 @@ Module::add(llvm::MDNode& llvm, unsigned slot) {
 StructType&
 Module::add(llvm::StructType* llvm) {
   auto* ptr = new StructType(llvm, *this);
-  struct_types.emplace_back(ptr);
+  struct_ptrs.emplace_back(ptr);
   m_structs.push_back(ptr);
   tmap[llvm] = ptr;
   return *ptr;
@@ -102,6 +115,11 @@ Module::get(const llvm::Argument& llvm) {
 BasicBlock&
 Module::get(const llvm::BasicBlock& llvm) {
   return get<BasicBlock>(llvm);
+}
+
+Comdat&
+Module::get(const llvm::Comdat& llvm) {
+  return *cmap.at(&llvm);
 }
 
 Instruction&
@@ -149,6 +167,11 @@ Module::get(const llvm::BasicBlock& llvm) const {
   return get<BasicBlock>(llvm);
 }
 
+const Comdat&
+Module::get(const llvm::Comdat& llvm) const {
+  return *cmap.at(&llvm);
+}
+
 const Instruction&
 Module::get(const llvm::Instruction& llvm) const {
   return get<Instruction>(llvm);
@@ -194,6 +217,11 @@ Module::aliases() const {
   return llvm::iterator_range<AliasIterator>(m_aliases);
 }
 
+llvm::iterator_range<Module::ComdatIterator>
+Module::comdats() const {
+  return llvm::iterator_range<ComdatIterator>(m_comdats);
+}
+
 llvm::iterator_range<Module::FunctionIterator>
 Module::functions() const {
   return llvm::iterator_range<FunctionIterator>(m_functions);
@@ -216,6 +244,10 @@ Module::structs() const {
 
 unsigned Module::get_num_aliases() const {
   return m_aliases.size();
+}
+
+unsigned Module::get_num_comdats() const {
+  return m_comdats.size();
 }
 
 unsigned Module::get_num_functions() const {
@@ -389,11 +421,26 @@ Module::create(const std::string& file) {
             new Module(std::move(llvm), std::move(context), std::move(mbuf)));
         parser.link(*module);
 
-        // // Sort the uses because it makes it easier when jumping around 
-        // for(auto& i : module->vmap)
-        //   static_cast<INavigable*>(i.second)->sort_uses();
-        // for(auto& i : module->mmap)
-        //   i.second->sort_uses();
+        // Sort the uses because it makes it easier when jumping around 
+        for(auto& i : module->vmap) {
+          Value* v = i.second;
+          if(auto* f = dyn_cast<Function>(v))
+            f->sort_uses();
+          else if(auto* arg = dyn_cast<Argument>(v))
+            arg->sort_uses();
+          else if(auto* bb = dyn_cast<BasicBlock>(v))
+            bb->sort_uses();
+          else if(auto* inst = dyn_cast<Instruction>(v))
+            inst->sort_uses();
+          else if(auto* alias = dyn_cast<GlobalAlias>(v))
+            alias->sort_uses();
+          else if(auto* g = dyn_cast<GlobalVariable>(v))
+            g->sort_uses();
+        }
+        for(auto& i : module->tmap)
+          i.second->sort_uses();
+        for(auto& i : module->mmap)
+          i.second->sort_uses();
       }
     } else {
       critical() << "Could not find LLVM bitcode or IR\n";

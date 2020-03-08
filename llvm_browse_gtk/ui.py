@@ -59,12 +59,45 @@ class LLVMTag(GtkSource.Tag):
         self.end = llvm_range.end
 
 
+class SourceTag(LLVMTag):
+    file = GObject.Property(
+        type=str,
+        default='',
+        nick='file',
+        blurb='Full path to the source file')
+
+    line = GObject.Property(
+        type=int,
+        default=0,
+        nick='line',
+        blurb='Line number in the source')
+
+    column = GObject.Property(
+        type=int,
+        default=1,
+        nick='column',
+        blurb='Column number within the line')
+
+    def __init__(self, source_defn, llvm_defn):
+        LLVMTag.__init__(self, llvm_defn)
+
+        self.file = source_defn.file
+        self.line = source_defn.begin.line
+        self.column = source_defn.begin.column
+        
+
 class DefinitionTag(LLVMTag):
     entity = GObject.Property(
         type=GObject.TYPE_UINT64,
         default=None,
         nick='entity',
         blurb='The entity at this definition')
+
+    source = GObject.Property(
+        type=SourceTag,
+        default=None,
+        nick='source',
+        blurb='The definition might have source information')
 
     def __init__(self, llvm_range, entity: int):
         LLVMTag.__init__(self, llvm_range)
@@ -101,6 +134,7 @@ class UseTag(LLVMTag):
         self.prev = prev
         if self.prev:
             self.prev.next = self
+
 
 
 class UI(GObject.GObject):
@@ -284,6 +318,12 @@ class UI(GObject.GObject):
         if self.options.window_maximized:
             self['win_main'].maximize()
 
+    # Implementation functions
+    # The callbacks functions could be invoked by different means, either a 
+    # menu click, a keyboard shortcut or may be even implicitly as a result
+    # of some other action. The do_* methods implement the actual funtionality
+    # so the callback functions just process the argument as necessary 
+
     def do_async(self, fn, *args):
         def impl(*args):
             fn(*args)
@@ -341,7 +381,7 @@ class UI(GObject.GObject):
 
         def add_category(label: str) -> Gtk.TreeIter:
             return self.trst_contents.append(
-                None, [lb.HANDLE_NULL,
+                None, [lb.get_null_handle(),
                        label,
                        '',
                        Pango.Style.NORMAL,
@@ -382,39 +422,75 @@ class UI(GObject.GObject):
 
             return tag
 
-        def add_tags(entity: int):
-            defn = lb.entity_get_llvm_defn(entity)
+        def add_tags(entity: int, source: bool=True) -> DefinitionTag:
+            llvm_defn = lb.entity_get_llvm_defn(entity)
+            
             # If we can't get a definition for the entity, don't bother trying 
             # to mark any uses
-            if defn:
-                defn_tag = add_tag(DefinitionTag(defn, entity))
+            if llvm_defn:
+                defn_tag = add_tag(DefinitionTag(llvm_defn, entity))
+
+                # The definition should be associated with a span rather than
+                # just the definition, but right now, the spans are not
+                # calculated correctly, so we'll just stick with the definition
+                # for now
+                # FIXME: Set the source tags to the span as well as the 
+                # definition
+                if source:
+                    source_defn = lb.entity_get_source_defn(entity)
+                    if source_defn:
+                        source_tag = add_tag(SourceTag(source_defn, llvm_defn))
+
                 prev_use = None
                 for use in lb.entity_get_uses(entity):
                     use_tag = add_tag(UseTag(use, defn_tag, prev_use))
                     prev_use = use_tag
                     if not defn_tag.use:
                         defn_tag.use = use_tag
+                return defn_tag
+            return None
 
         module = self.app.module
         for f in lb.module_get_functions(module):
-            add_tags(f)
+            defn_tag = add_tags(f)
             for arg in lb.func_get_args(f):
                 add_tags(arg)
             for bb in lb.func_get_blocks(f):
-                add_tags(bb)
+                add_tags(bb, source=False)
                 for inst in lb.block_get_instructions(bb):
                     add_tags(inst)
+            comdat = lb.func_get_comdat(f)
+            if comdat:
+                add_tag(UseTag(lb.comdat_get_self_llvm_defn(comdat), defn_tag))
 
-        for entities in (lb.module_get_aliases(module),
-                         lb.module_get_globals(module)):
-            for entity in entities:
-                add_tags(entity)
+        for g in lb.module_get_globals(module):
+            defn_tag = add_tags(g)
+            comdat = lb.global_get_comdat(g)
+            if comdat:
+                add_tag(UseTag(lb.comdat_get_self_llvm_defn(comdat), defn_tag))
+
+        for a in lb.module_get_aliases(module):
+            add_tags(a, source=False)
 
     def do_open(self):
         self.srcbuf_llvm.set_text(lb.module_get_code(self.app.module))
 
         self.do_populate_contents()
         self.do_compute_tags()
+
+    def do_goto_definition(self, use_tag: UseTag):
+        pass
+
+    def do_goto_prev_use(self, use_tag: UseTag): 
+        pass
+
+    def do_goto_next_use(self, use_tag: UseTag):
+        pass
+
+    def do_show_source(self, source_tag: SourceTag):
+        pass
+
+    # Callback functions
 
     def on_open_recent(self, widget: Gtk.Widget) -> bool:
         file, _ = GLib.filename_from_uri(widget.get_current_item().get_uri())
@@ -531,9 +607,11 @@ class UI(GObject.GObject):
             if over_text:
                 for tag in i.get_tags():
                     if isinstance(tag, DefinitionTag):
-                        print('Got definition', tag.entity.source_name)
-                    elif isinstance(tag, UseTag):
+                        print('Got definition: ', lb.entity_get_source_name(tag.entity))
+                    if isinstance(tag, UseTag):
                         print('Got use', tag)
+                    if isinstance(tag, SourceTag):
+                        print('Got source', tag.file, tag.line, tag.column)
         return False
 
     def on_goto_line(self, *args) -> bool:

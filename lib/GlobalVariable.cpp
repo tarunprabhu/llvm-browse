@@ -4,6 +4,7 @@
 #include "Module.h"
 
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/IR/Comdat.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -15,11 +16,14 @@ namespace lb {
 
 GlobalVariable::GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module) :
     Value(Value::Kind::GlobalVariable),
-    INavigable(), IWrapper<llvm::GlobalVariable>(llvm_g, module), di(nullptr) {
+    INavigable(), IWrapper<llvm::GlobalVariable>(llvm_g, module),
+    comdat(nullptr), di(nullptr) {
   if(llvm_g.hasName())
     set_tag(llvm_g.getName(), "@");
   else
     critical() << "Cannot set tag for unnamed global" << llvm_g << "\n";
+  if(llvm::Comdat* llvm_c = llvm_g.getComdat())
+  	comdat = &module.get(*llvm_c);
 
   llvm::SmallVector<llvm::DIGlobalVariableExpression*, 4> dis;
   llvm_g.getDebugInfo(dis);
@@ -62,6 +66,11 @@ GlobalVariable::get_llvm_name() const {
 llvm::StringRef
 GlobalVariable::get_full_name() const {
   return llvm::StringRef(full_name);
+}
+
+const Comdat*
+GlobalVariable::get_comdat() const {
+	return comdat;
 }
 
 bool

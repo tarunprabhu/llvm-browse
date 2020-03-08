@@ -9,6 +9,7 @@
 #include <map>
 #include <vector>
 
+#include "Comdat.h"
 #include "Errors.h"
 #include "LLVMRange.h"
 #include "MDNode.h"
@@ -36,23 +37,32 @@ class Value;
 //
 class alignas(ALIGN_OBJ) Module {
 protected:
+  // Managed memory for objects that will always live for the duration of
+  // the object but will never be touched directly
   std::unique_ptr<llvm::LLVMContext> context;
   std::unique_ptr<llvm::Module> llvm;
-  std::vector<std::unique_ptr<Value>> values;
-  std::vector<std::unique_ptr<MDNode>> mds;
-  std::vector<std::unique_ptr<StructType>> struct_types;
+  std::vector<std::unique_ptr<Comdat>> comdat_ptrs;
+  std::vector<std::unique_ptr<Value>> value_ptrs;
+  std::vector<std::unique_ptr<MDNode>> mdnode_ptrs;
+  std::vector<std::unique_ptr<StructType>> struct_ptrs;
   std::unique_ptr<llvm::MemoryBuffer> buffer;
+
+  // When looking up anything, these will be actually returned
+  std::vector<const Comdat*> m_comdats;
   std::vector<const Function*> m_functions;
   std::vector<const GlobalVariable*> m_globals;
   std::vector<const GlobalAlias*> m_aliases;
   std::vector<const MDNode*> m_metadata;
   std::vector<const StructType*> m_structs;
-  std::map<const llvm::Value*, Value*> vmap;
+
+  std::map<const llvm::Comdat*, Comdat*> cmap;
   std::map<const llvm::MDNode*, MDNode*> mmap;
   std::map<llvm::StructType*, StructType*> tmap;
+  std::map<const llvm::Value*, Value*> vmap;
 
 public:
   using AliasIterator    = decltype(m_aliases)::const_iterator;
+  using ComdatIterator   = decltype(m_comdats)::const_iterator;
   using FunctionIterator = decltype(m_functions)::const_iterator;
   using GlobalIterator   = decltype(m_globals)::const_iterator;
   using MetadataIterator = decltype(m_metadata)::const_iterator;
@@ -89,20 +99,10 @@ protected:
            std::enable_if_t<!std::is_pointer<LLVM>::value, int> = 0>
   T& add(LLVM& llvm, ArgsT&&... args) {
     T* ptr = new T(llvm, args..., *this);
-    values.emplace_back(ptr);
+    value_ptrs.emplace_back(ptr);
     vmap[&llvm] = ptr;
     return *ptr;
   }
-
-  StructType& get(llvm::StructType* llvm);
-  Argument& get(const llvm::Argument& llvm);
-  BasicBlock& get(const llvm::BasicBlock& llvm);
-  Instruction& get(const llvm::Instruction& llvm);
-  Function& get(const llvm::Function& llvm);
-  GlobalAlias& get(const llvm::GlobalAlias& llvm);
-  GlobalVariable& get(const llvm::GlobalVariable& llvm);
-  MDNode& get(const llvm::MDNode& llvm);
-  Value& get(const llvm::Value& llvm);
 
   bool check_range(const LLVMRange& range, llvm::StringRef tag) const;
   bool check_uses(const INavigable& navigable) const;
@@ -122,6 +122,7 @@ public:
   // These should be refactored at some point so they are not public
   Argument& add(llvm::Argument& llvm, Function& f);
   BasicBlock& add(llvm::BasicBlock& llvm, Function& f);
+  Comdat& add(llvm::Comdat&, llvm::GlobalObject& g);
   Function& add(llvm::Function& llvm);
   GlobalAlias& add(llvm::GlobalAlias& llvm);
   GlobalVariable& add(llvm::GlobalVariable& llvm);
@@ -129,9 +130,21 @@ public:
   MDNode& add(llvm::MDNode& llvm, unsigned slot);
   StructType& add(llvm::StructType* llvm);
 
+  Argument& get(const llvm::Argument& llvm);
+  BasicBlock& get(const llvm::BasicBlock& llvm);
+  Comdat& get(const llvm::Comdat& llvm);
+  Instruction& get(const llvm::Instruction& llvm);
+  Function& get(const llvm::Function& llvm);
+  GlobalAlias& get(const llvm::GlobalAlias& llvm);
+  GlobalVariable& get(const llvm::GlobalVariable& llvm);
+  MDNode& get(const llvm::MDNode& llvm);
+  StructType& get(llvm::StructType* llvm);
+  Value& get(const llvm::Value& llvm);
+
   const StructType& get(llvm::StructType* llvm) const;
   const Argument& get(const llvm::Argument& llvm) const;
   const BasicBlock& get(const llvm::BasicBlock& llvm) const;
+  const Comdat& get(const llvm::Comdat& llvm) const;
   const Instruction& get(const llvm::Instruction& llvm) const;
   const Function& get(const llvm::Function& llvm) const;
   const GlobalAlias& get(const llvm::GlobalAlias& llvm) const;
@@ -140,12 +153,14 @@ public:
   const Value& get(const llvm::Value& llvm) const;
 
   llvm::iterator_range<AliasIterator> aliases() const;
+  llvm::iterator_range<ComdatIterator> comdats() const;
   llvm::iterator_range<FunctionIterator> functions() const;
   llvm::iterator_range<GlobalIterator> globals() const;
   llvm::iterator_range<MetadataIterator> metadata() const;
   llvm::iterator_range<StructIterator> structs() const;
 
   unsigned get_num_aliases() const;
+  unsigned get_num_comdats() const;
   unsigned get_num_functions() const;
   unsigned get_num_globals() const;
   unsigned get_num_metadata() const;
@@ -163,11 +178,6 @@ public:
 
 public:
   static std::unique_ptr<Module> create(const std::string& file);
-
-public:
-  // We want most (all?) of the public methods to be const. The only time the
-  // module should be modified at all is when it is created.
-  friend class Parser;
 };
 
 } // namespace lb

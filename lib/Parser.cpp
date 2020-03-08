@@ -308,6 +308,12 @@ Parser::link(Module& module) {
 
   llvm::Module& llvm = module.get_llvm();
 
+  // The next steps are done in order for a reason
+  // As of LLVM 8, the StructType's appear first in the IR file followed by the 
+  // Comdat's, GlobalVariable's, GlobalAlias'es and the Function's. 
+  // We don't want to have to keep jumping back and forth for things in the 
+  // text so we process everything in order
+
   message() << "Reading types\n";
   for(llvm::StructType* llvm_sty : llvm.getIdentifiedStructTypes()) {
     // TODO: At some point, we'll deal with unnamed struct types
@@ -321,6 +327,35 @@ Parser::link(Module& module) {
     }
   }
 
+  // The comdats are unusual because what looks like a "definition" in the LLVM
+  // IR, we will treat as an implicit use and attach a definition to it.
+  // This definition will be the same as the function/global that the
+  // Comdat represents
+  std::map<llvm::Function*, size_t> comdats;
+  message() << "Reading comdats\n";
+  for(llvm::Function& f : llvm.functions()) {
+    if(llvm::Comdat* comdat = f.getComdat()) {
+      Comdat& c  = module.add(*comdat, f);
+      size_t pos = find_and_move(c.get_tag(), Lookback::Newline, cursor);
+      if(pos == llvm::StringRef::npos)
+        critical() << "Could not find comdat definition: " << c.get_tag()
+                   << "\n";
+      else
+        c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+    }
+  }
+  for(llvm::GlobalVariable& g : llvm.globals()) {
+    if(llvm::Comdat* comdat = g.getComdat()) {
+      Comdat& c  = module.add(*comdat, g);
+      size_t pos = find_and_move(c.get_tag(), Lookback::Newline, cursor);
+      if(pos == llvm::StringRef::npos)
+        critical() << "Could not find comdat definition: " << c.get_tag()
+                   << "\n";
+      else
+        c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+    }
+  }
+
   message() << "Reading global variables\n";
   for(llvm::GlobalVariable& llvm_g : llvm.globals()) {
     // TODO: At some point, we'll deal with unnamed globals. Right now,
@@ -329,11 +364,15 @@ Parser::link(Module& module) {
     if(llvm_g.hasName()) {
       GlobalVariable& g = module.add(llvm_g);
       size_t pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
-      if(pos == llvm::StringRef::npos)
+      if(pos == llvm::StringRef::npos) {
         critical() << "Could not find global definition: " << g.get_tag()
                    << "\n";
-      else
-        g.set_llvm_defn(LLVMRange(pos, pos + g.get_tag().size()));
+      } else {
+        LLVMRange defn(pos, pos + g.get_tag().size());
+        g.set_llvm_defn(defn);
+        if(llvm::Comdat* c = llvm_g.getComdat()) 
+          module.get(*c).set_llvm_defn(defn);
+      }
 
       // FIXME: Skipping any metadata on global variables because I can't
       // figure out how to get just the non-debug 
@@ -360,11 +399,15 @@ Parser::link(Module& module) {
     Function& f            = module.add(llvm_f);
     llvm::StringRef prefix = llvm_f.size() ? "define" : "declare";
     size_t pos             = find_function(f.get_tag(), prefix, cursor);
-    if(pos == llvm::StringRef::npos)
+    if(pos == llvm::StringRef::npos) {
       critical() << "Could not find function definition: " << f.get_tag()
                  << "\n";
-    else
-      f.set_llvm_defn(LLVMRange(pos, pos + f.get_tag().size()));
+    } else {
+      LLVMRange defn(pos, pos + f.get_tag().size());
+      f.set_llvm_defn(defn);
+      if(llvm::Comdat* c = llvm_f.getComdat())
+        module.get(*c).set_llvm_defn(defn);
+    }
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
   }

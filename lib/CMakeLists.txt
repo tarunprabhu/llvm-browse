@@ -1,6 +1,7 @@
 set(SOURCES
   Argument.cpp
   BasicBlock.cpp
+  Comdat.cpp
   DIUtils.cpp
   Function.cpp
   GlobalAlias.cpp

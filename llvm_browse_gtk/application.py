@@ -20,7 +20,7 @@ GObject.type_register(GtkSource.View)
 class Application(Gtk.Application):
     module = GObject.Property(
         type=GObject.TYPE_UINT64,
-        default=lb.HANDLE_NULL,
+        default=lb.get_null_handle(),
         nick='module',
         blurb='Handle to the LLVM module')
 
@@ -43,7 +43,7 @@ class Application(Gtk.Application):
     def _reset(self):
         if self.module:
             self.lb_module_free(self.module)
-        self.module = lb.HANDLE_NULL
+        self.module = lb.get_null_handle(),
         self.llvm = ''
 
     def do_activate(self) -> bool:

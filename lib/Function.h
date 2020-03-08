@@ -17,6 +17,7 @@ namespace lb {
 
 class Argument;
 class BasicBlock;
+class Comdat;
 class Module;
 
 class alignas(ALIGN_OBJ) Function :
@@ -26,6 +27,7 @@ class alignas(ALIGN_OBJ) Function :
 protected:
   std::vector<Argument*> args;
   std::vector<BasicBlock*> bbs;
+  Comdat* comdat;
   const llvm::DISubprogram* di;
   std::string source_name;
   std::string full_name;
@@ -44,6 +46,7 @@ public:
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  const Comdat* get_comdat() const;
   bool is_mangled() const;
   bool is_artificial() const;
   bool is_defined() const;

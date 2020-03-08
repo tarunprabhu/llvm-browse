@@ -12,6 +12,7 @@
 
 namespace lb {
 
+class Comdat;
 class Module;
 
 class alignas(ALIGN_OBJ) GlobalVariable :
@@ -19,6 +20,7 @@ class alignas(ALIGN_OBJ) GlobalVariable :
     public INavigable,
     IWrapper<llvm::GlobalVariable> {
 protected:
+	Comdat* comdat;
   const llvm::DIGlobalVariable* di;
   std::string source_name;
   std::string full_name;
@@ -33,6 +35,7 @@ public:
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  const Comdat* get_comdat() const;
   bool is_artificial() const;
   bool is_mangled() const;
 
