@@ -161,6 +161,12 @@ Module::comdats() const {
                                               ComdatIterator(m_comdats.end()));
 }
 
+llvm::iterator_range<Module::DeclIterator>
+Module::decls() const {
+  return llvm::iterator_range<DeclIterator>(DeclIterator(m_decls.begin()),
+                                            DeclIterator(m_decls.end()));
+}
+
 llvm::iterator_range<Module::FunctionIterator>
 Module::functions() const {
   return llvm::iterator_range<FunctionIterator>(
@@ -262,7 +268,9 @@ bin_search(Offset offset,
            const std::vector<std::unique_ptr<T>>& vec,
            unsigned left,
            unsigned right) {
-  if(left > right)
+  // left and right are unsigned, so if right goes to -1, it will still be 
+  // greater than left
+  if(left > right or (left >= vec.size()) or (right >= vec.size()))
     return nullptr;
 
   unsigned mid = std::floor(left + right) / 2;
@@ -394,10 +402,8 @@ Module::sort() {
             m_functions.end(),
             [](const std::unique_ptr<Function>& l,
                const std::unique_ptr<Function>& r) {
-              if(l->get_llvm_span() and r->get_llvm_span())
-                return l->get_llvm_span().get_begin()
-                       < r->get_llvm_span().get_begin();
-              return false;
+              return l->get_llvm_span().get_begin()
+                     < r->get_llvm_span().get_begin();
             });
 
   message() << "Sorting comdats\n";
@@ -405,9 +411,8 @@ Module::sort() {
       m_comdats.begin(),
       m_comdats.end(),
       [](const std::unique_ptr<Comdat>& l, const std::unique_ptr<Comdat>& r) {
-        if(l->get_llvm_defn() and r->get_llvm_span())
-          return l->get_llvm_defn().get_begin() < r->get_llvm_defn().get_end();
-        return false;
+        return l->get_self_llvm_defn().get_begin()
+               < r->get_self_llvm_defn().get_begin();
       });
 }
 

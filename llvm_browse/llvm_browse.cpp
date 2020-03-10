@@ -61,28 +61,49 @@ get_py_handle(const T& ptr, HandleKind tag) {
 }
 
 static PyObject*
-get_py_handle(const lb::INavigable* v) {
-  if(const auto* alias = dyn_cast<lb::GlobalAlias>(v))
+get_py_handle(const lb::Value& v) {
+  if(const auto* alias = dyn_cast<lb::GlobalAlias>(&v))
     return get_py_handle(*alias, HandleKind::GlobalAlias);
-  else if(const auto* arg = dyn_cast<lb::Argument>(v))
+  else if(const auto* arg = dyn_cast<lb::Argument>(&v))
     return get_py_handle(*arg, HandleKind::Argument);
-  else if(const auto* bb = dyn_cast<lb::BasicBlock>(v))
+  else if(const auto* bb = dyn_cast<lb::BasicBlock>(&v))
     return get_py_handle(*bb, HandleKind::BasicBlock);
-  else if(const auto* comdat = dyn_cast<lb::Comdat>(v))
-    return get_py_handle(*comdat, HandleKind::Comdat);
-  else if(const auto* f = dyn_cast<lb::Function>(v))
+  else if(const auto* f = dyn_cast<lb::Function>(&v))
     return get_py_handle(*f, HandleKind::Function);
-  else if(const auto* g = dyn_cast<lb::GlobalVariable>(v))
+  else if(const auto* g = dyn_cast<lb::GlobalVariable>(&v))
     return get_py_handle(*g, HandleKind::GlobalVariable);
-  else if(const auto* inst = dyn_cast<lb::Instruction>(v))
+  else if(const auto* inst = dyn_cast<lb::Instruction>(&v))
     return get_py_handle(*inst, HandleKind::Instruction);
-  else if(const auto* md = dyn_cast<lb::MDNode>(v))
+  else
+    lb::error() << "Cannot get handle for lb::Value: "
+                << static_cast<int>(v.get_kind()) << "\n";
+
+  return nullptr;
+}
+
+static PyObject*
+get_py_handle(const lb::INavigable& v) {
+  if(const auto* alias = dyn_cast<lb::GlobalAlias>(&v))
+    return get_py_handle(*alias, HandleKind::GlobalAlias);
+  else if(const auto* arg = dyn_cast<lb::Argument>(&v))
+    return get_py_handle(*arg, HandleKind::Argument);
+  else if(const auto* bb = dyn_cast<lb::BasicBlock>(&v))
+    return get_py_handle(*bb, HandleKind::BasicBlock);
+  else if(const auto* comdat = dyn_cast<lb::Comdat>(&v))
+    return get_py_handle(*comdat, HandleKind::Comdat);
+  else if(const auto* f = dyn_cast<lb::Function>(&v))
+    return get_py_handle(*f, HandleKind::Function);
+  else if(const auto* g = dyn_cast<lb::GlobalVariable>(&v))
+    return get_py_handle(*g, HandleKind::GlobalVariable);
+  else if(const auto* inst = dyn_cast<lb::Instruction>(&v))
+    return get_py_handle(*inst, HandleKind::Instruction);
+  else if(const auto* md = dyn_cast<lb::MDNode>(&v))
     return get_py_handle(*md, HandleKind::MDNode);
-  else if(const auto* s = dyn_cast<lb::StructType>(v))
+  else if(const auto* s = dyn_cast<lb::StructType>(&v))
     return get_py_handle(*s, HandleKind::StructType);
   else
-    lb::error() << "Cannot get handle: " << static_cast<int>(v->get_kind())
-                << "\n";
+    lb::error() << "Cannot get handle for lb::Navigable: "
+                << static_cast<int>(v.get_kind()) << "\n";
 
   return nullptr;
 }
@@ -194,6 +215,13 @@ static PyObject*
 convert(llvm::StringRef s) {
   if(s.size())
     return PyUnicode_FromString(s.data());
+  return PyUnicode_FromString("");
+}
+
+static PyObject*
+convert(const std::string& s) {
+  if(s.size())
+    return PyUnicode_FromString(s.c_str());
   return PyUnicode_FromString("");
 }
 
@@ -424,7 +452,7 @@ module_free(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_def_at(PyObject* self, PyObject* args) {
   Handle handle = HANDLE_NULL;
-  uint64_t offset = 0;
+  lb::Offset offset = 0;
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
@@ -437,7 +465,7 @@ module_get_def_at(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_use_at(PyObject* self, PyObject* args) {
   Handle handle = HANDLE_NULL;
-  uint64_t offset = 0;
+  lb::Offset offset = 0;
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
   
@@ -448,9 +476,22 @@ module_get_use_at(PyObject* self, PyObject* args) {
 }
 
 static PyObject*
+module_get_comdat_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  lb::Offset offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::Comdat* comdat = module.get_comdat_at(offset))
+    return get_py_handle(*comdat, HandleKind::Comdat);
+  return get_py_handle();
+}
+
+static PyObject*
 module_get_function_at(PyObject* self, PyObject* args) {
   Handle handle = HANDLE_NULL;
-  uint64_t offset = 0;
+  lb::Offset offset = 0;
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
@@ -463,7 +504,7 @@ module_get_function_at(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_block_at(PyObject* self, PyObject* args) {
   Handle handle = HANDLE_NULL;
-  uint64_t offset = 0;
+  lb::Offset offset = 0;
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
@@ -476,7 +517,7 @@ module_get_block_at(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_instruction_at(PyObject* self, PyObject* args) {
   Handle handle = HANDLE_NULL;
-  uint64_t offset = 0;
+  lb::Offset offset = 0;
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
@@ -646,6 +687,11 @@ comdat_get_llvm_span(PyObject* self, PyObject* args) {
 static PyObject*
 comdat_get_tag(PyObject* self, PyObject* args) {
   return convert(get_object<lb::Comdat>(parse_handle(args)).get_tag());
+}
+
+static PyObject*
+comdat_get_target(PyObject* self, PyObject* args) {
+  return get_py_handle(get_object<lb::Comdat>(parse_handle(args)).get_target());
 }
 
 // Function interface
@@ -1212,6 +1258,11 @@ entity_is_artificial(PyObject* self, PyObject* args) {
   }
 }
 
+static PyObject*
+entity_get_kind_name(PyObject* self, PyObject* args) {
+  return convert(get_handle_kind_name(parse_handle(args)));
+}
+
 #define FUNC(name, descr)                                                      \
   { #name, (PyCFunction)name, METH_VARARGS, descr }
 
@@ -1241,6 +1292,7 @@ static PyMethodDef module_methods[] = {
     FUNC(module_get_structs, "A list of handles to the structs in the module"),
     FUNC(module_get_def_at, "Gets the definition at the offset or HANDLE_NULL"),
     FUNC(module_get_use_at, "Gets the use at the offset or HANDLE_NULL"),
+    FUNC(module_get_comdat_at, "Gets the comdat at the offset or HANDLE_NULL"),
     FUNC(module_get_function_at,
          "Gets the function at the offset or HANDLE_NULL"),
     FUNC(module_get_block_at, "Gets the block at the offset or HANDLE_NULL"),
@@ -1283,6 +1335,7 @@ static PyMethodDef module_methods[] = {
     FUNC(comdat_get_self_llvm_defn, "LLVM definition of the comdat itself"),
     FUNC(comdat_get_llvm_span, "LLVM span of the comdat"),
     FUNC(comdat_get_tag, "Tag of the comdat"),
+    FUNC(comdat_get_target, "Target of the comdat"),
 
     // Function interface
     FUNC(func_get_llvm_defn, "LLVM definition range of the function"),
@@ -1362,6 +1415,7 @@ static PyMethodDef module_methods[] = {
     FUNC(entity_get_full_name, "Full name of the entity"),
     FUNC(entity_is_artificial,
          "True if the entity was generated by the compiler"),
+    FUNC(entity_get_kind_name, "The entity kind"),
 
     // End sentinel
     {nullptr, nullptr, 0, nullptr},

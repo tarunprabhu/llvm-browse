@@ -167,7 +167,10 @@ Function::arguments() const {
 Function&
 Function::make(const llvm::Function& llvm_f, Module& module) {
   auto *f = new Function(llvm_f, module);
-  module.m_functions.emplace_back(f);
+  if(llvm_f.size())
+    module.m_functions.emplace_back(f);
+  else 
+    module.m_decls.emplace_back(f);
   module.vmap[&llvm_f] = f;
 
   return *f;

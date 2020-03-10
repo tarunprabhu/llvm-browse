@@ -13,7 +13,7 @@ Use::Use(Offset begin,
          Offset end,
          const INavigable& used,
          const Instruction* inst) :
-    range(begin, end), used(&used), inst(inst) {
+    range(begin, end), used(used), inst(inst) {
   ;
 }
 
@@ -27,7 +27,7 @@ Use::get_end() const {
   return range.get_end();
 }
 
-const INavigable*
+const INavigable&
 Use::get_used() const {
   return used;
 }

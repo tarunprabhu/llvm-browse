@@ -49,6 +49,10 @@ protected:
   // iterator that exposes a reference to these instead of the pointer
   std::vector<std::unique_ptr<GlobalAlias>> m_aliases;
   std::vector<std::unique_ptr<Comdat>> m_comdats;
+  // We make a distinction between functions and declarations mainly to search
+  // Functions with definitions have a span and need to be ordered
+  // Declarations have no body and the best we can do is find uses of it
+  std::vector<std::unique_ptr<Function>> m_decls;
   std::vector<std::unique_ptr<Function>> m_functions;
   std::vector<std::unique_ptr<GlobalVariable>> m_globals;
   std::vector<std::unique_ptr<MDNode>> m_metadata;
@@ -72,6 +76,7 @@ protected:
 public:
   using AliasIterator    = DerefIterator<decltype(m_aliases)::const_iterator>;
   using ComdatIterator   = DerefIterator<decltype(m_comdats)::const_iterator>;
+  using DeclIterator     = DerefIterator<decltype(m_decls)::const_iterator>;
   using FunctionIterator = DerefIterator<decltype(m_functions)::const_iterator>;
   using GlobalIterator   = DerefIterator<decltype(m_globals)::const_iterator>;
   using MetadataIterator = DerefIterator<decltype(m_metadata)::const_iterator>;
@@ -148,6 +153,7 @@ public:
 
   llvm::iterator_range<AliasIterator> aliases() const;
   llvm::iterator_range<ComdatIterator> comdats() const;
+  llvm::iterator_range<DeclIterator> decls() const;
   llvm::iterator_range<FunctionIterator> functions() const;
   llvm::iterator_range<GlobalIterator> globals() const;
   llvm::iterator_range<MetadataIterator> metadata() const;

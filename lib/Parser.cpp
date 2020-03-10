@@ -511,6 +511,7 @@ Parser::link(Module& module) {
     // it is incorrect to have an instruction use preceding a definition
     for(llvm::BasicBlock& llvm_bb : llvm_f) {
       BasicBlock& bb = module.get(llvm_bb);
+      Instruction* inst_prev = nullptr;
       for(const llvm::Instruction& llvm_inst : llvm_bb) {
         Instruction& inst   = module.get(llvm_inst);
         llvm::StringRef tag = inst.get_tag();
@@ -572,6 +573,22 @@ Parser::link(Module& module) {
 
         std::map<INavigable*, Offset> mapped
             = associate_values(std::move(ops), module, i_begin, &inst);
+
+        // Because instructions can span multiple lines, a reasonable way to 
+        // determine the span of an instruction is to wait until the next
+        // instruction in the block is found and assume that it extends till 
+        // the end of the nearest non-empty line prior to the current 
+        // instruction. The last instruction in the basic block will be 
+        // dealt with when the span of the basic block is computed because it 
+        // will be assumed to span till the end of the block
+        if(inst_prev) {
+          Offset end = cursor;
+          while(ir[end] != '\n')
+            end--;
+          inst_prev->set_llvm_span(
+              LLVMRange(inst_prev->get_llvm_defn().get_begin(), end));
+        }
+        inst_prev = &inst;
       }
 
       // There isn't a reasonable way to find the start of a basic block
@@ -582,7 +599,6 @@ Parser::link(Module& module) {
       // definition of a basic block other than to the start of the first
       // instruction
       Offset bb_begin = module.get(llvm_bb.front()).get_llvm_defn().get_begin();
-      bb.set_llvm_span(LLVMRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular
@@ -604,10 +620,14 @@ Parser::link(Module& module) {
           bb_end -= 1;
       }
 
-      if(bb_end != llvm::StringRef::npos)
+      if(bb_end != llvm::StringRef::npos) {
         bb.set_llvm_span(LLVMRange(bb_begin, bb_end));
-      else
+        if(inst_prev)
+          inst_prev->set_llvm_span(
+              LLVMRange(inst_prev->get_llvm_defn().get_begin(), bb_end));
+      } else {
         warning() << "Could not compute span for basic block\n";
+      }
     }
 
     Offset f_end = module.get(llvm_f.back()).get_llvm_span().get_end();

@@ -30,10 +30,10 @@ public:
 
   uint64_t get_begin() const;
   uint64_t get_end() const;
-  const INavigable* get_defined() const;
+  const INavigable& get_defined() const;
   template<typename T>
-  const T* get_defined_as() const {
-    return llvm::dyn_cast<T>(this);
+  const T& get_defined_as() const {
+    return *llvm::cast<T>(defined);
   }
 
   operator bool() const {

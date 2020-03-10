@@ -22,12 +22,12 @@ Comdat::Comdat(const llvm::Comdat& llvm_c,
 
 void
 Comdat::set_self_llvm_defn(const LLVMRange& defn) {
-  this->defn = defn;
+  self_defn = defn;
 }
 
 const LLVMRange&
 Comdat::get_self_llvm_defn() const {
-  return defn;
+  return self_defn;
 }
 
 const Value&

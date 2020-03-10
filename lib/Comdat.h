@@ -22,7 +22,7 @@ class alignas(ALIGN_OBJ) Comdat :
     public IWrapper<llvm::Comdat> {
 protected:
   const llvm::GlobalObject& target;
-  LLVMRange defn;
+  LLVMRange self_defn;
 
 protected:
   Comdat(const llvm::Comdat& comdat,

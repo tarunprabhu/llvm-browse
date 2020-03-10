@@ -20,9 +20,9 @@ Definition::get_end() const {
   return end;
 }
 
-const INavigable*
+const INavigable&
 Definition::get_defined() const {
-  return defined;
+  return *defined;
 }
 
 Definition&

@@ -23,7 +23,7 @@ protected:
   lb::LLVMRange range;
 
   // The value at this location in the IR
-  const INavigable* used;
+  const INavigable& used;
 
   // The instruction is for when this Use corresponds to an instruction
   // operand. A use could also be present in two other places:
@@ -50,7 +50,7 @@ public:
   bool has_user() const;
   Offset get_begin() const;
   Offset get_end() const;
-  const INavigable* get_used() const;
+  const INavigable& get_used() const;
   const Instruction* get_instruction() const;
 
   operator bool() const {
