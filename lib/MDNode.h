@@ -6,8 +6,8 @@
 
 #include "INavigable.h"
 #include "IWrapper.h"
-#include "Typedefs.h"
 #include "SourceRange.h"
+#include "Typedefs.h"
 
 namespace lb {
 
@@ -16,16 +16,23 @@ class Module;
 class alignas(ALIGN_OBJ) MDNode :
     public INavigable,
     public IWrapper<llvm::MDNode> {
+protected:
+  MDNode(const llvm::MDNode& llvm, unsigned slot, Module& module);
+
 public:
-  MDNode(llvm::MDNode& llvm, unsigned slot, Module& module);
+  MDNode()          = delete;
+  MDNode(MDNode&)   = delete;
+  MDNode(MDNode&&)  = delete;
   virtual ~MDNode() = default;
 
   bool is_artificial() const;
 
 public:
-	static bool classof(const INavigable* v) {
-		return v->get_kind() == EntityKind::MDNode;
-	}
+  static bool classof(const INavigable* v) {
+    return v->get_kind() == EntityKind::MDNode;
+  }
+
+  static MDNode& make(const llvm::MDNode& llvm, unsigned slot, Module& module);
 };
 
 } // namespace lb

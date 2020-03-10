@@ -43,8 +43,7 @@ error(bool start) {
 
 FormattedStream::FormattedStream(const std::string& label,
                                  llvm::raw_ostream::Colors color) :
-    fs(llvm::errs()),
-    label(label), color(color) {
+    fs(llvm::errs()), label(label), color(color) {
   ;
 }
 

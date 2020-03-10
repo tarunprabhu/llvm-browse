@@ -9,8 +9,9 @@ class Module;
 template<typename LLVM_T>
 class IWrapper {
 public:
-  typedef std::conditional_t<std::is_pointer<LLVM_T>::value, LLVM_T, LLVM_T&>
-      WrappedType;
+  typedef std::
+      conditional_t<std::is_pointer<LLVM_T>::value, LLVM_T, const LLVM_T&>
+          WrappedType;
 
 private:
   WrappedType llvm_t;
@@ -36,7 +37,7 @@ public:
     return module;
   }
 
-  const WrappedType get_llvm() const {
+  WrappedType get_llvm() const {
     return llvm_t;
   }
 };

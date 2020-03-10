@@ -20,14 +20,19 @@ class alignas(ALIGN_OBJ) GlobalVariable :
     public INavigable,
     IWrapper<llvm::GlobalVariable> {
 protected:
-	Comdat* comdat;
+  const Comdat* comdat;
   const llvm::DIGlobalVariable* di;
   std::string source_name;
   std::string full_name;
 
+protected:
+  GlobalVariable(const llvm::GlobalVariable& llvm_g, Module& module);
+
 public:
-  GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module);
-  virtual ~GlobalVariable() = default;
+  GlobalVariable()                 = delete;
+  GlobalVariable(GlobalVariable&)  = delete;
+  GlobalVariable(GlobalVariable&&) = delete;
+  virtual ~GlobalVariable()        = default;
 
   bool has_source_info() const;
   bool has_source_name() const;
@@ -43,10 +48,13 @@ public:
   static bool classof(const Value* v) {
     return v->get_kind() == EntityKind::GlobalVariable;
   }
- 	
+
   static bool classof(const INavigable* v) {
-  	return v->get_kind() == EntityKind::GlobalVariable;
+    return v->get_kind() == EntityKind::GlobalVariable;
   }
+
+  static GlobalVariable& make(const llvm::GlobalVariable& llvm_g,
+                              Module& module);
 };
 
 } // namespace lb

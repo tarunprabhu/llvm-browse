@@ -34,9 +34,9 @@ class INavigable {
 protected:
   EntityKind kind;
 
-  // The tag is the "label" of the entity in the LLVM IR. For instructions, 
-  // this might have the form "^%.+$" where the characters after the percent 
-  // sign are typically numbers but they don't have to be. 
+  // The tag is the "label" of the entity in the LLVM IR. For instructions,
+  // this might have the form "^%.+$" where the characters after the percent
+  // sign are typically numbers but they don't have to be.
   // For struct types, this will be "%.+", for globals, this will be "^@.+$"
   std::string tag;
 
@@ -45,7 +45,7 @@ protected:
   // go when the user asks to go to the definition of an entity.
   // For basic blocks, it corresponds to the start of the first instruction
   // in the block and may be of length 0. For instructions that return a value,
-  // this will be the "%<slot> = % part of the instruction while for those 
+  // this will be the "%<slot> = % part of the instruction while for those
   // that don't return a value, it may cover the instruction opcode although
   // it might be better if it is of length 0 and positioned just at the start
   // of the op code
@@ -57,8 +57,8 @@ protected:
   // the end of the last. It may be invalid for other entities
   LLVMRange llvm_span;
 
-  // The source defn is the range in characters in the source code that 
-  // the definition of the entity covers. For functions and globals, this 
+  // The source defn is the range in characters in the source code that
+  // the definition of the entity covers. For functions and globals, this
   // will simply span the beginning to the end of the name in the source code
   SourceRange source_defn;
 
@@ -69,7 +69,7 @@ protected:
   // the source range of all those instructions are likely to be identical
   // Still, this is mainly here so we have a decent starting point at which
   // to position the cursor in the source even if we can't do anything else
-  // beyond that 
+  // beyond that
   SourceRange source_span;
 
   // This is sort of messy because not everything that is navigable ought to
@@ -95,7 +95,7 @@ public:
   void set_tag(llvm::StringRef name,
                llvm::StringRef prefix,
                bool may_need_quotes = true);
-  
+
   void sort_uses();
   void add_use(const Use&);
 

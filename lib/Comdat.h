@@ -21,11 +21,18 @@ class alignas(ALIGN_OBJ) Comdat :
     public INavigable,
     public IWrapper<llvm::Comdat> {
 protected:
-  llvm::GlobalObject& target;
+  const llvm::GlobalObject& target;
   LLVMRange defn;
 
+protected:
+  Comdat(const llvm::Comdat& comdat,
+         const llvm::GlobalObject& target,
+         Module& module);
+
 public:
-  Comdat(llvm::Comdat& comdat, llvm::GlobalObject& target, Module& module);
+  Comdat()          = delete;
+  Comdat(Comdat&)   = delete;
+  Comdat(Comdat&&)  = delete;
   virtual ~Comdat() = default;
 
   // Because we treat this as a "special use", the definition will actually be
@@ -43,9 +50,13 @@ public:
   const T& get_target_as() const;
 
 public:
-	static bool classof(INavigable* v) {
-		return v->get_kind() == EntityKind::Comdat;
-	}
+  static bool classof(const INavigable* v) {
+    return v->get_kind() == EntityKind::Comdat;
+  }
+
+  static Comdat& make(const llvm::Comdat& comdat,
+                      const llvm::GlobalObject& target,
+                      Module& module);
 };
 
 } // namespace lb

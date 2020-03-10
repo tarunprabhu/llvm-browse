@@ -13,18 +13,18 @@ namespace lb {
 // keeping line and column numbers
 class alignas(ALIGN_OBJ) LLVMRange {
 protected:
-  uint64_t begin;
-  uint64_t end;
+  Offset begin;
+  Offset end;
 
 public:
   LLVMRange();
-  LLVMRange(uint64_t begin, uint64_t end);
+  LLVMRange(Offset begin, Offset end);
 
-  uint64_t get_begin() const;
-  uint64_t get_end() const;
+  Offset get_begin() const;
+  Offset get_end() const;
 
   operator bool() const {
-  	return (begin > 0) and (end > 0);
+    return (begin > 0) and (end > 0);
   }
 };
 

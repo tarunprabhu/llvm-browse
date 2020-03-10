@@ -1,6 +1,8 @@
 #ifndef LLVM_BROWSE_PARSER_H
 #define LLVM_BROWSE_PARSER_H
 
+#include "Typedefs.h"
+
 #include <llvm/AsmParser/SlotMapping.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -12,8 +14,8 @@
 namespace lb {
 
 class Instruction;
-class Module;
 class INavigable;
+class Module;
 class Value;
 
 // Currently, this is not actually a parser, but it really ought to be
@@ -55,27 +57,27 @@ protected:
 protected:
   std::vector<const llvm::MDNode*> get_metadata(const llvm::GlobalObject&);
   std::vector<const llvm::MDNode*> get_metadata(const llvm::Instruction&);
-  
+
   // Helper function used when assocating values with uses.
   // Checks if the position has already been associated with another value
   // in the map
-  bool overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped);
+  bool overlaps(Offset pos, const std::map<INavigable*, Offset>& mapped);
 
-  // Associate the values with uses starting at the cursor. An optional 
-  // instruction argument associates the uses with the parent instruction 
+  // Associate the values with uses starting at the cursor. An optional
+  // instruction argument associates the uses with the parent instruction
   // if any
-  std::map<INavigable*, size_t>
+  std::map<INavigable*, Offset>
   associate_values(std::vector<INavigable*> values,
                    Module& module,
-                   size_t cursor,
+                   Offset cursor,
                    Instruction* inst = nullptr);
 
-  size_t find(llvm::StringRef key,
-              size_t cursor,
+  Offset find(llvm::StringRef key,
+              Offset cursor,
               Lookback prev,
               bool wrap,
-              std::set<size_t>& seen);
-  size_t find(llvm::StringRef key, size_t cursor, Lookback prev, bool wrap);
+              std::set<Offset>& seen);
+  Offset find(llvm::StringRef key, Offset cursor, Lookback prev, bool wrap);
 
   // This is meant to find the operands of a constant (typically a
   // ConstantArray, ConstantStruct or ConstantExpr) that we want to be able
@@ -108,13 +110,13 @@ protected:
   // one match as much as possible. If at_start is true, the key is expected
   // at the start of a line
   //
-  size_t find_and_move(const std::string& key, Lookback prev, size_t& cursor);
-  size_t find_and_move(llvm::StringRef key, Lookback prev, size_t& cursor);
-  size_t find_function(llvm::StringRef func,
+  Offset find_and_move(const std::string& key, Lookback prev, Offset& cursor);
+  Offset find_and_move(llvm::StringRef key, Lookback prev, Offset& cursor);
+  Offset find_function(llvm::StringRef func,
                        llvm::StringRef prefix,
-                       size_t& cursor,
-                       std::set<size_t>& seen);
-  size_t
+                       Offset& cursor,
+                       std::set<Offset>& seen);
+  Offset
   find_function(llvm::StringRef func, llvm::StringRef prefix, size_t& cursor);
 
 public:

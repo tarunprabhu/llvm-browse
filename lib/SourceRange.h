@@ -17,7 +17,7 @@ protected:
   SourcePoint begin;
   SourcePoint end;
 
-public:  
+public:
   SourceRange();
   SourceRange(const char* file, unsigned begin_line, unsigned begin_col);
   SourceRange(const char* file,
@@ -41,6 +41,6 @@ public:
   }
 };
 
-} // namespace
+} // namespace lb
 
 #endif // LLVM_BROWSE_SOURCE_RANGE_H

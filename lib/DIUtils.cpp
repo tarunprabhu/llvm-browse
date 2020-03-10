@@ -102,24 +102,29 @@ get_full_name(const llvm::DIGlobalVariable* di, llvm::raw_string_ostream& ss) {
   return true;
 }
 
-std::string get_name(const llvm::DINamespace* di) {
-	return format_name(di->getName());
+std::string
+get_name(const llvm::DINamespace* di) {
+  return format_name(di->getName());
 }
 
-std::string get_name(const llvm::DICompositeType* di) {
-	return format_name(di->getName());
+std::string
+get_name(const llvm::DICompositeType* di) {
+  return format_name(di->getName());
 }
 
-std::string get_name(const llvm::DILocalVariable* di) {
-	return format_name(di->getName());
+std::string
+get_name(const llvm::DILocalVariable* di) {
+  return format_name(di->getName());
 }
 
-std::string get_name(const llvm::DIGlobalVariable* di) {
-	return format_name(di->getName());
+std::string
+get_name(const llvm::DIGlobalVariable* di) {
+  return format_name(di->getName());
 }
 
-std::string get_name(const llvm::DISubprogram* di) {
-	return format_name(di->getName());
+std::string
+get_name(const llvm::DISubprogram* di) {
+  return format_name(di->getName());
 }
 
 std::string

@@ -9,16 +9,23 @@ namespace lb {
 
 namespace DebugInfo {
 
-std::string get_name(const llvm::DINamespace*);
-std::string get_name(const llvm::DICompositeType*);
-std::string get_name(const llvm::DILocalVariable*);
-std::string get_name(const llvm::DIGlobalVariable*);
-std::string get_name(const llvm::DISubprogram*);
+std::string
+get_name(const llvm::DINamespace*);
+std::string
+get_name(const llvm::DICompositeType*);
+std::string
+get_name(const llvm::DILocalVariable*);
+std::string
+get_name(const llvm::DIGlobalVariable*);
+std::string
+get_name(const llvm::DISubprogram*);
 
-std::string get_full_name(const llvm::DISubprogram*);
-std::string get_full_name(const llvm::DIGlobalVariable*);
+std::string
+get_full_name(const llvm::DISubprogram*);
+std::string
+get_full_name(const llvm::DIGlobalVariable*);
 
-} // DebugInfo
+} // namespace DebugInfo
 
 } // namespace lb
 

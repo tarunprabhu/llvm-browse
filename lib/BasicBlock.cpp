@@ -11,37 +11,50 @@ using llvm::isa;
 
 namespace lb {
 
-BasicBlock::BasicBlock(llvm::BasicBlock& llvm_bb, Function& f, Module& module) :
+BasicBlock::BasicBlock(const llvm::BasicBlock& llvm_bb,
+                       Function& f,
+                       Module& module) :
     Value(EntityKind::BasicBlock),
-    INavigable(EntityKind::BasicBlock), IWrapper<llvm::BasicBlock>(llvm_bb,
-                                                                   module) {
-  for(llvm::Instruction& inst : llvm_bb)
-    insts.push_back(&get_module().add(inst, f));
+    INavigable(EntityKind::BasicBlock),
+    IWrapper<llvm::BasicBlock>(llvm_bb, module),
+    parent(f) {
+  for(const llvm::Instruction& inst : llvm_bb)
+    Instruction::make(inst, *this, f, module);
 }
 
-BasicBlock::Iterator
+BasicBlock::InstIterator
 BasicBlock::begin() const {
-  return insts.cbegin();
+  return InstIterator(m_insts.begin());
 }
 
-BasicBlock::Iterator
+BasicBlock::InstIterator
 BasicBlock::end() const {
-  return insts.cend();
+  return InstIterator(m_insts.end());
 }
 
-llvm::iterator_range<BasicBlock::Iterator>
+llvm::iterator_range<BasicBlock::InstIterator>
 BasicBlock::instructions() const {
-  return llvm::iterator_range<BasicBlock::Iterator>(insts);
+  return llvm::iterator_range<InstIterator>(InstIterator(m_insts.begin()),
+                                            InstIterator(m_insts.end()));
+}
+
+Function&
+BasicBlock::get_function() {
+  return parent;
 }
 
 const Function&
 BasicBlock::get_function() const {
-  return get_module().get(*get_llvm().getParent());
+  return parent;
 }
 
-// const llvm::BasicBlock&
-// BasicBlock::get_llvm() const {
-//   return cast<llvm::BasicBlock>(llvm);
-// }
+BasicBlock&
+BasicBlock::make(const llvm::BasicBlock& llvm_bb, Function& f, Module& module) {
+  auto* bb = new BasicBlock(llvm_bb, f, module);
+  f.m_blocks.emplace_back(bb);
+  module.vmap[&llvm_bb] = bb;
+
+  return *bb;
+}
 
 } // namespace lb

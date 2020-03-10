@@ -1,9 +1,11 @@
 #ifndef LLVM_BROWSE_TYPEDEFS_H
 #define LLVM_BROWSE_TYPEDEFS_H
 
-#include <stdint.h>
+#include <cstddef>
 
 namespace lb {
+
+using Offset = std::size_t;
 
 // Empty new line type used to align the output stream
 struct NewLineT {};

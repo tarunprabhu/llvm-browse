@@ -16,15 +16,19 @@ using llvm::isa;
 
 namespace lb {
 
-Instruction::Instruction(llvm::Instruction& llvm_i, Function& f, Module& module) :
+Instruction::Instruction(const llvm::Instruction& llvm_i,
+                         BasicBlock& bb,
+                         Function& f,
+                         Module& module) :
     Value(EntityKind::Instruction),
-    INavigable(EntityKind::Instruction), IWrapper<llvm::Instruction>(llvm_i, module),
+    INavigable(EntityKind::Instruction),
+    IWrapper<llvm::Instruction>(llvm_i, module),
+    parent(bb),
     di(llvm_i.getDebugLoc()) {
-  if(const llvm::DebugLoc& loc = llvm_i.getDebugLoc()) {
-    if(const auto* scope = dyn_cast<llvm::DIScope>(loc.getScope())) {
-      SourceRange defn = SourceRange(scope->getFilename().data(),
-                                     loc.getLine(),
-                                     loc.getCol());
+  if(di) {
+    if(const auto* scope = dyn_cast<llvm::DIScope>(di.getScope())) {
+      SourceRange defn
+          = SourceRange(scope->getFilename().data(), di.getLine(), di.getCol());
       set_source_defn(defn);
       // The calls to LLVM's debug metadata intrinsics sometimes contain more
       // accurate location information than the DI nodes themselves. So if we
@@ -41,9 +45,9 @@ Instruction::Instruction(llvm::Instruction& llvm_i, Function& f, Module& module)
               wrapped_arg.set_source_defn(defn);
             }
             // In optimized code, there may not exist an alloca corresponding
-            // to a stack variable. Any old instruction that sets the value
+            // to a stack variable. Any instruction that sets the value
             // of some register variable could get mapped to a local variable
-            // in the source. Short of creating a separate local variable 
+            // in the source. Short of creating a separate local variable
             // object, there is not much we can do with it.
           }
         }
@@ -57,7 +61,8 @@ Instruction::has_source_info() const {
   return di;
 }
 
-llvm::StringRef Instruction::get_llvm_name() const {
+llvm::StringRef
+Instruction::get_llvm_name() const {
   return get_tag();
 }
 
@@ -86,14 +91,31 @@ Instruction::operands() const {
   return llvm::iterator_range<Instruction::Iterator>(ops);
 }
 
+BasicBlock&
+Instruction::get_block() {
+  return parent;
+}
+
 const BasicBlock&
 Instruction::get_block() const {
-  return get_module().get(*get_llvm().getParent());
+  return parent;
 }
 
 const Function&
 Instruction::get_function() const {
   return get_block().get_function();
+}
+
+Instruction&
+Instruction::make(const llvm::Instruction& llvm_i,
+                  BasicBlock& bb,
+                  Function& f,
+                  Module& module) {
+  auto* inst = new Instruction(llvm_i, bb, f, module);
+  bb.m_insts.emplace_back(inst);
+  module.vmap[&llvm_i] = inst;
+
+  return *inst;
 }
 
 } // namespace lb

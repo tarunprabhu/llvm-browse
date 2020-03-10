@@ -4,7 +4,6 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/ModuleSlotTracker.h>
 
-#include "Module.h"
 #include "Value.h"
 
 namespace lb {
@@ -20,9 +19,6 @@ public:
   static bool classof(const Value* v) {
     return v->get_kind() == Value::Kind::Constant;
   }
-
-public:
-  friend class Module;
 };
 
 } // namespace lb

@@ -1,4 +1,5 @@
 #include "Use.h"
+#include "Module.h"
 
 #include <llvm/Support/Casting.h>
 
@@ -8,21 +9,20 @@ using llvm::isa;
 
 namespace lb {
 
-Use::Use(uint64_t begin,
-         uint64_t end,
+Use::Use(Offset begin,
+         Offset end,
          const INavigable& used,
          const Instruction* inst) :
-    range(begin, end),
-    used(&used), inst(inst) {
+    range(begin, end), used(&used), inst(inst) {
   ;
 }
 
-uint64_t
+Offset
 Use::get_begin() const {
   return range.get_begin();
 }
 
-uint64_t
+Offset
 Use::get_end() const {
   return range.get_end();
 }
@@ -35,6 +35,18 @@ Use::get_used() const {
 const Instruction*
 Use::get_instruction() const {
   return inst;
+}
+
+Use&
+Use::make(Offset begin,
+          Offset end,
+          const INavigable& used,
+          Module& module,
+          const Instruction* inst) {
+  auto* use = new Use(begin, end, used, inst);
+  module.uses.emplace_back(use);
+
+  return *use;
 }
 
 } // namespace lb

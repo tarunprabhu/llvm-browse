@@ -7,12 +7,14 @@ SourcePoint::SourcePoint(unsigned line, unsigned column) :
   ;
 }
 
-unsigned SourcePoint::get_line() const {
-	return line;
+unsigned
+SourcePoint::get_line() const {
+  return line;
 }
 
-unsigned SourcePoint::get_column() const {
-	return column;
+unsigned
+SourcePoint::get_column() const {
+  return column;
 }
 
 } // namespace lb

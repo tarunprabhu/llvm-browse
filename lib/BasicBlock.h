@@ -5,16 +5,18 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/ModuleSlotTracker.h>
 
+#include <memory>
 #include <vector>
 
 #include "INavigable.h"
 #include "IWrapper.h"
+#include "Instruction.h"
+#include "Iterator.h"
 #include "Value.h"
 
 namespace lb {
 
 class Function;
-class Instruction;
 class Module;
 
 class BasicBlock :
@@ -22,18 +24,25 @@ class BasicBlock :
     public INavigable,
     public IWrapper<llvm::BasicBlock> {
 protected:
-  std::vector<Instruction*> insts;
+  std::vector<std::unique_ptr<Instruction>> m_insts;
+  Function& parent;
 
 public:
-  using Iterator = decltype(insts)::const_iterator;
+  using InstIterator = DerefIterator<decltype(m_insts)::const_iterator>;
+
+protected:
+  BasicBlock(const llvm::BasicBlock& llvm_bb, Function& f, Module& module);
+  Function& get_function();
 
 public:
-  BasicBlock(llvm::BasicBlock& llvm_bb, Function& f, Module& module);
-  virtual ~BasicBlock() = default;
+  BasicBlock()             = delete;
+  BasicBlock(BasicBlock&)  = delete;
+  BasicBlock(BasicBlock&&) = delete;
+  virtual ~BasicBlock()    = default;
 
-  Iterator begin() const;
-  Iterator end() const;
-  llvm::iterator_range<Iterator> instructions() const;
+  InstIterator begin() const;
+  InstIterator end() const;
+  llvm::iterator_range<InstIterator> instructions() const;
   const Function& get_function() const;
 
 public:
@@ -44,6 +53,15 @@ public:
   static bool classof(const INavigable* v) {
     return v->get_kind() == EntityKind::BasicBlock;
   }
+
+  static BasicBlock&
+  make(const llvm::BasicBlock& llvm_bb, Function& f, Module& module);
+
+public:
+  friend Instruction& Instruction::make(const llvm::Instruction& llvm_i,
+                                        BasicBlock& bb,
+                                        Function& f,
+                                        Module& module);
 };
 
 } // namespace lb

@@ -4,11 +4,11 @@
 #include "Function.h"
 #include "GlobalAlias.h"
 #include "GlobalVariable.h"
-#include "Instruction.h"
 #include "INavigable.h"
+#include "Instruction.h"
 #include "Logging.h"
-#include "Module.h"
 #include "MDNode.h"
+#include "Module.h"
 #include "Value.h"
 
 #include <llvm/AsmParser/Parser.h>
@@ -34,7 +34,7 @@ sort_by_tag_name(std::vector<T*>& objs) {
   });
   std::reverse(objs.begin(), objs.end());
 }
-  
+
 Parser::Parser() : local_slots(nullptr), global_slots(nullptr) {
   ;
 }
@@ -48,10 +48,8 @@ Parser::parse_ir(std::unique_ptr<llvm::MemoryBuffer> in,
   std::unique_ptr<llvm::Module> module;
   std::unique_ptr<llvm::MemoryBuffer> out;
   llvm::SMDiagnostic error;
-  if((module = llvm::parseAssembly(in->getMemBufferRef(),
-                                   error,
-                                   context,
-                                   global_slots.get()))) {
+  if((module = llvm::parseAssembly(
+          in->getMemBufferRef(), error, context, global_slots.get()))) {
     out = std::move(in);
     ir  = out->getBuffer();
   } else {
@@ -90,13 +88,13 @@ Parser::parse_bc(std::unique_ptr<llvm::MemoryBuffer> in,
   return std::make_tuple(std::move(module), std::move(out));
 }
 
-size_t
+Offset
 Parser::find(llvm::StringRef key,
-             size_t cursor,
+             Offset cursor,
              Lookback prev,
              bool wrap,
-             std::set<size_t>& seen) {
-  size_t found = ir.find(key, cursor);
+             std::set<Offset>& seen) {
+  Offset found = ir.find(key, cursor);
   if(found == llvm::StringRef::npos) {
     if(wrap)
       return find(key, 0, prev, false, seen);
@@ -118,7 +116,7 @@ Parser::find(llvm::StringRef key,
       break;
     case Lookback::Indent:
       if(found > 0) {
-        for(size_t i = 1; (not discard) and (ir[found - i] != '\n'); i++)
+        for(Offset i = 1; (not discard) and (ir[found - i] != '\n'); i++)
           if(!std::isspace(ir[found - i]))
             discard = true;
         if(not discard)
@@ -139,15 +137,15 @@ Parser::find(llvm::StringRef key,
   }
 }
 
-size_t
-Parser::find(llvm::StringRef key, size_t cursor, Lookback prev, bool wrap) {
-  std::set<size_t> seen;
+Offset
+Parser::find(llvm::StringRef key, Offset cursor, Lookback prev, bool wrap) {
+  std::set<Offset> seen;
   return find(key, cursor, prev, wrap, seen);
 }
 
-size_t
-Parser::find_and_move(llvm::StringRef key, Lookback prev, size_t& cursor) {
-  size_t found = find(key, cursor, prev, true);
+Offset
+Parser::find_and_move(llvm::StringRef key, Lookback prev, Offset& cursor) {
+  Offset found = find(key, cursor, prev, true);
   if(found != llvm::StringRef::npos)
     cursor = found + key.size();
   else
@@ -155,26 +153,26 @@ Parser::find_and_move(llvm::StringRef key, Lookback prev, size_t& cursor) {
   return found;
 }
 
-size_t
-Parser::find_and_move(const std::string& key, Lookback prev, size_t& cursor) {
+Offset
+Parser::find_and_move(const std::string& key, Lookback prev, Offset& cursor) {
   return find_and_move(llvm::StringRef(key), prev, cursor);
 }
 
-size_t
+Offset
 Parser::find_function(llvm::StringRef func,
                       llvm::StringRef prefix,
-                      size_t& cursor,
-                      std::set<size_t>& seen) {
+                      Offset& cursor,
+                      std::set<Offset>& seen) {
   // Search for the prefix wrapping around if necessary
-  size_t line_start = find(prefix, cursor, Lookback::Newline, true);
+  Offset line_start = find(prefix, cursor, Lookback::Newline, true);
   if(line_start != llvm::StringRef::npos) {
     // The only way we don't find a newline is if it is the last line
-    size_t line_end
+    Offset line_end
         = find("\n", line_start + prefix.size(), Lookback::Any, false);
     if(line_end == llvm::StringRef::npos)
       line_end = find("\0", line_start + prefix.size(), Lookback::Any, false);
     llvm::StringRef substr = ir.substr(line_start, line_end - line_start);
-    size_t found           = substr.find(func);
+    Offset found           = substr.find(func);
     if(found != llvm::StringRef::npos) {
       found  = line_start + found;
       cursor = found + func.size();
@@ -188,11 +186,11 @@ Parser::find_function(llvm::StringRef func,
   return llvm::StringRef::npos;
 }
 
-size_t
+Offset
 Parser::find_function(llvm::StringRef func,
                       llvm::StringRef prefix,
-                      size_t& cursor) {
-  std::set<size_t> seen;
+                      Offset& cursor) {
+  std::set<Offset> seen;
   return find_function(func, prefix, cursor, seen);
 }
 
@@ -232,21 +230,21 @@ Parser::collect_constants(const llvm::Constant* c, Module& module) {
 }
 
 bool
-Parser::overlaps(size_t pos, const std::map<INavigable*, size_t>& mapped) {
+Parser::overlaps(Offset pos, const std::map<INavigable*, Offset>& mapped) {
   for(const auto& it : mapped) {
     const INavigable* v = it.first;
-    size_t begin       = it.second;
-    size_t end         = begin + v->get_tag().size();
+    Offset begin        = it.second;
+    Offset end          = begin + v->get_tag().size();
     if(pos >= begin and pos <= end)
       return true;
   }
   return false;
 }
 
-std::map<INavigable*, size_t>
+std::map<INavigable*, Offset>
 Parser::associate_values(std::vector<INavigable*> values,
                          Module& module,
-                         size_t cursor,
+                         Offset cursor,
                          Instruction* inst) {
   // The list of values provided here are typically the operands in a
   // LLVM::Instruction or llvm::ConstantExpr. We need to find the corresponding
@@ -254,14 +252,14 @@ Parser::associate_values(std::vector<INavigable*> values,
   // of text
 
   sort_by_tag_name(values);
-  std::map<INavigable*, size_t> mapped;
+  std::map<INavigable*, Offset> mapped;
   for(INavigable* v : values) {
     llvm::StringRef tag = v->get_tag();
-    size_t pos          = find(tag, cursor, Lookback::Whitespace, false);
+    Offset pos          = find(tag, cursor, Lookback::Whitespace, false);
     while(overlaps(pos, mapped))
       pos = find(tag, pos + 1, Lookback::Whitespace, false);
     mapped[v] = pos;
-    v->add_use(module.add_use(pos, pos + v->get_tag().size(), *v, inst));
+    v->add_use(Use::make(pos, pos + v->get_tag().size(), *v, module, inst));
   }
 
   return mapped;
@@ -310,16 +308,16 @@ Parser::link(Module& module) {
   llvm::raw_string_ostream ss(buf);
   std::vector<INavigable*> ops;
   std::set<const llvm::MDNode*> wl;
-  size_t cursor = 0;
+  Offset cursor = 0;
 
   local_slots.reset(new llvm::ModuleSlotTracker(&module.get_llvm()));
 
   llvm::Module& llvm = module.get_llvm();
 
   // The next steps are done in order for a reason
-  // As of LLVM 8, the StructType's appear first in the IR file followed by the 
-  // Comdat's, GlobalVariable's, GlobalAlias'es and the Function's. 
-  // We don't want to have to keep jumping back and forth for things in the 
+  // As of LLVM 8, the StructType's appear first in the IR file followed by the
+  // Comdat's, GlobalVariable's, GlobalAlias'es and the Function's.
+  // We don't want to have to keep jumping back and forth for things in the
   // text so we process everything in order
 
   message() << "Reading types\n";
@@ -327,10 +325,10 @@ Parser::link(Module& module) {
     // TODO: At some point, we'll deal with unnamed struct types
     // but right now, I'm not sure how to get a handle to them in the IR
     if(llvm_sty->hasName()) {
-      StructType& sty = module.add(llvm_sty);
-      size_t pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
+      StructType& sty = StructType::make(llvm_sty, module);
+      Offset pos      = find_and_move(sty.get_tag(), Lookback::Newline, cursor);
       sty.set_llvm_defn(
-          module.add_definition(pos, pos + sty.get_tag().size(), sty));
+          Definition::make(pos, pos + sty.get_tag().size(), sty, module));
     } else {
       warning() << "Skipping unnamed struct type: " << llvm_sty << "\n";
     }
@@ -340,28 +338,30 @@ Parser::link(Module& module) {
   // IR, we will treat as an implicit use and attach a definition to it.
   // This definition will be the same as the function/global that the
   // Comdat represents
-  std::map<llvm::Function*, size_t> comdats;
+  std::map<llvm::Function*, Offset> comdats;
   message() << "Reading comdats\n";
   for(llvm::Function& f : llvm.functions()) {
-    if(llvm::Comdat* comdat = f.getComdat()) {
-      Comdat& c  = module.add(*comdat, f);
-      size_t pos = find_and_move(c.get_tag(), Lookback::Newline, cursor);
+    if(llvm::Comdat* llvm_c = f.getComdat()) {
+      Comdat& comdat  = Comdat::make(*llvm_c, f, module);
+      Offset pos = find_and_move(comdat.get_tag(), Lookback::Newline, cursor);
       if(pos == llvm::StringRef::npos)
-        critical() << "Could not find comdat definition: " << c.get_tag()
+        critical() << "Could not find comdat definition: " << comdat.get_tag()
                    << "\n";
-      // else
-      //   c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+      else
+        comdat.set_self_llvm_defn(
+            LLVMRange(pos, pos + comdat.get_tag().size()));
     }
   }
   for(llvm::GlobalVariable& g : llvm.globals()) {
-    if(llvm::Comdat* comdat = g.getComdat()) {
-      Comdat& c  = module.add(*comdat, g);
-      size_t pos = find_and_move(c.get_tag(), Lookback::Newline, cursor);
+    if(llvm::Comdat* llvm_c = g.getComdat()) {
+      Comdat& comdat  = Comdat::make(*llvm_c, g, module);
+      Offset pos = find_and_move(comdat.get_tag(), Lookback::Newline, cursor);
       if(pos == llvm::StringRef::npos)
-        critical() << "Could not find comdat definition: " << c.get_tag()
+        critical() << "Could not find comdat definition: " << comdat.get_tag()
                    << "\n";
-      // else
-      //   c.set_self_llvm_defn(LLVMRange(pos, pos + c.get_tag().size()));
+      else
+        comdat.set_self_llvm_defn(
+            LLVMRange(pos, pos + comdat.get_tag().size()));
     }
   }
 
@@ -371,20 +371,21 @@ Parser::link(Module& module) {
     // we stick to named globals because we can definitely get a handle to
     // them in the LLVM IR
     if(llvm_g.hasName()) {
-      GlobalVariable& g = module.add(llvm_g);
-      size_t pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
+      GlobalVariable& g = GlobalVariable::make(llvm_g, module);
+      Offset pos        = find_and_move(g.get_tag(), Lookback::Newline, cursor);
       if(pos == llvm::StringRef::npos) {
         critical() << "Could not find global definition: " << g.get_tag()
                    << "\n";
       } else {
-        uint64_t end = pos + g.get_tag().size();
-        g.set_llvm_defn(module.add_definition(pos, end, g));
-        // if(llvm::Comdat* c = llvm_g.getComdat())
-        //   module.get(*c).set_llvm_defn(module.add_definition(pos, end, *c));
+        Offset end = pos + g.get_tag().size();
+        Definition& def = Definition::make(pos, end, g, module);
+        g.set_llvm_defn(def);
+        if(llvm::Comdat* c = llvm_g.getComdat())
+          module.get(*c).set_llvm_defn(def);
       }
 
       // FIXME: Skipping any metadata on global variables because I can't
-      // figure out how to get just the non-debug 
+      // figure out how to get just the non-debug
       // for(const llvm::MDNode* md : get_metadata(llvm_g))
       //   wl.insert(md);
     } else {
@@ -394,28 +395,30 @@ Parser::link(Module& module) {
 
   message() << "Reading global aliases\n";
   for(llvm::GlobalAlias& llvm_a : llvm.aliases()) {
-    GlobalAlias& a = module.add(llvm_a);
-    size_t pos     = find_and_move(a.get_tag(), Lookback::Newline, cursor);
+    GlobalAlias& a = GlobalAlias::make(llvm_a, module);
+    Offset pos     = find_and_move(a.get_tag(), Lookback::Newline, cursor);
     if(pos == llvm::StringRef::npos)
       critical() << "Could not find alias definition: " << a.get_tag() << "\n";
     else
-      a.set_llvm_defn(module.add_definition(pos, pos + a.get_tag().size(), a));
+      a.set_llvm_defn(
+          Definition::make(pos, pos + a.get_tag().size(), a, module));
   }
 
   // Do this in two passes because there may be circular references
   message() << "Reading functions\n";
   for(llvm::Function& llvm_f : llvm.functions()) {
-    Function& f            = module.add(llvm_f);
+    Function& f            = Function::make(llvm_f, module);
     llvm::StringRef prefix = llvm_f.size() ? "define" : "declare";
-    size_t pos             = find_function(f.get_tag(), prefix, cursor);
+    Offset pos             = find_function(f.get_tag(), prefix, cursor);
     if(pos == llvm::StringRef::npos) {
       critical() << "Could not find function definition: " << f.get_tag()
                  << "\n";
     } else {
-      uint64_t end = pos + f.get_tag().size();
-      f.set_llvm_defn(module.add_definition(pos, end, f));
-      // if(llvm::Comdat* c = llvm_f.getComdat())
-      //   module.get(*c).set_llvm_defn(defn);
+      Offset end = pos + f.get_tag().size();
+      Definition& def = Definition::make(pos, end, f, module);
+      f.set_llvm_defn(def);
+      if(llvm::Comdat* c = llvm_f.getComdat())
+        module.get(*c).set_llvm_defn(def);
     }
     for(const llvm::MDNode* md : get_metadata(llvm_f))
       wl.insert(md);
@@ -423,16 +426,16 @@ Parser::link(Module& module) {
 
   message() << "Reading metadata\n";
   for(const auto& i : global_slots->MetadataNodes) {
-    MDNode& md = module.add(*i.second, i.first);
+    MDNode& md = MDNode::make(*i.second, i.first, module);
     buf.clear();
     ss << md.get_tag() << " =";
-    size_t pos = find_and_move(ss.str(), Lookback::Newline, cursor);
+    Offset pos = find_and_move(ss.str(), Lookback::Newline, cursor);
     if(pos == llvm::StringRef::npos)
       critical() << "Could not find metadata definition: " << md.get_tag()
                  << "\n";
     else
       md.set_llvm_defn(
-          module.add_definition(pos, pos + md.get_tag().size(), md));
+          Definition::make(pos, pos + md.get_tag().size(), md, module));
   }
 
   message() << "Processing global variables\n";
@@ -458,7 +461,7 @@ Parser::link(Module& module) {
     // things will  be closer
     cursor = f.get_llvm_defn().get_end();
     local_slots->incorporateFunction(llvm_f);
-    size_t f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
+    Offset f_begin = find_and_move(llvm::StringRef("{"), Lookback::Any, cursor);
     for(llvm::Argument& llvm_arg : llvm_f.args()) {
       Argument& arg = module.get(llvm_arg);
       if(llvm_arg.hasName())
@@ -516,12 +519,12 @@ Parser::link(Module& module) {
         if(not llvm_inst.getType()->isVoidTy())
           ss << " =";
 
-        size_t i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
+        Offset i_begin = find_and_move(ss.str(), Lookback::Whitespace, cursor);
         if(llvm_inst.getType()->isVoidTy())
-          inst.set_llvm_defn(module.add_definition(i_begin, i_begin, inst));
+          inst.set_llvm_defn(Definition::make(i_begin, i_begin, inst, module));
         else
           inst.set_llvm_defn(
-              module.add_definition(i_begin, i_begin + tag.size(), inst));
+              Definition::make(i_begin, i_begin + tag.size(), inst, module));
 
         // Because we don't want to even try to parse the instruction operands,
         // everything will have to be text-based matching. To reduce the
@@ -567,7 +570,7 @@ Parser::link(Module& module) {
           wl.insert(llvm_md);
         }
 
-        std::map<INavigable*, size_t> mapped
+        std::map<INavigable*, Offset> mapped
             = associate_values(std::move(ops), module, i_begin, &inst);
       }
 
@@ -578,8 +581,7 @@ Parser::link(Module& module) {
       // We don't really have a reasonable place to go to when we go to the
       // definition of a basic block other than to the start of the first
       // instruction
-      size_t bb_begin
-          = module.get(llvm_bb.front()).get_llvm_defn().get_begin();
+      Offset bb_begin = module.get(llvm_bb.front()).get_llvm_defn().get_begin();
       bb.set_llvm_span(LLVMRange(bb_begin, bb_begin));
 
       // Similarly, the end of the block is a bit problematic because
@@ -590,7 +592,7 @@ Parser::link(Module& module) {
       // an empty line between basic blocks (hopefully that won't go away)
       // If it is the last basic block in the function, then look for the
       // closing brace because that indicates the end of the function
-      size_t bb_end = llvm::StringRef::npos;
+      Offset bb_end = llvm::StringRef::npos;
       if(&llvm_bb != &llvm_f.back()) {
         bb_end
             = find_and_move(llvm::StringRef("\n"), Lookback::Newline, cursor);
@@ -608,7 +610,7 @@ Parser::link(Module& module) {
         warning() << "Could not compute span for basic block\n";
     }
 
-    size_t f_end = module.get(llvm_f.back()).get_llvm_defn().get_end();
+    Offset f_end = module.get(llvm_f.back()).get_llvm_span().get_end();
     if(f_end != llvm::StringRef::npos)
       f.set_llvm_span(LLVMRange(f_begin, f_end + 1));
     else
@@ -657,9 +659,9 @@ Parser::link(Module& module) {
           ss << ",";
         else
           ss << "}";
-        size_t pos = find_and_move(ss.str(), Lookback::Any, cursor);
+        Offset pos = find_and_move(ss.str(), Lookback::Any, cursor);
         if(pos != llvm::StringRef::npos)
-          op.add_use(module.add_use(pos, pos + op.get_tag().size(), op));
+          op.add_use(Use::make(pos, pos + op.get_tag().size(), op, module));
         else
           warning() << "Could not find metadata operand: " << op.get_tag()
                     << "\n";

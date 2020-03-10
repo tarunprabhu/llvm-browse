@@ -14,9 +14,14 @@ class alignas(ALIGN_OBJ) GlobalAlias :
     public Value,
     public INavigable,
     public IWrapper<llvm::GlobalAlias> {
+protected:
+  GlobalAlias(const llvm::GlobalAlias& llvm_a, Module& module);
+
 public:
-  GlobalAlias(llvm::GlobalAlias& llvm_a, Module& module);
-  virtual ~GlobalAlias() = default;
+  GlobalAlias()              = delete;
+  GlobalAlias(GlobalAlias&)  = delete;
+  GlobalAlias(GlobalAlias&&) = delete;
+  virtual ~GlobalAlias()     = default;
 
   // This will not have any source information
   bool has_source_info() const;
@@ -30,8 +35,10 @@ public:
   }
 
   static bool classof(const INavigable* v) {
-  	return v->get_kind() == EntityKind::GlobalAlias;
+    return v->get_kind() == EntityKind::GlobalAlias;
   }
+
+  static GlobalAlias& make(const llvm::GlobalAlias& llvm_a, Module& module);
 };
 
 } // namespace lb

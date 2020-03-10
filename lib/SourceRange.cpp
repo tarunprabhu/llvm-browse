@@ -17,36 +17,42 @@ SourceRange::SourceRange(const char* file,
                          unsigned begin_column,
                          unsigned end_line,
                          unsigned end_column) :
-    file(file),
-    begin({begin_line, begin_column}), end({end_line, end_column}) {
+    file(file), begin({begin_line, begin_column}), end({end_line, end_column}) {
   ;
 }
 
-const char* SourceRange::get_file() const {
+const char*
+SourceRange::get_file() const {
   return file;
 }
 
-const SourcePoint& SourceRange::get_begin() const {
+const SourcePoint&
+SourceRange::get_begin() const {
   return begin;
 }
 
-unsigned SourceRange::get_begin_line() const {
+unsigned
+SourceRange::get_begin_line() const {
   return get_begin().get_line();
 }
 
-unsigned SourceRange::get_begin_column() const {
+unsigned
+SourceRange::get_begin_column() const {
   return get_begin().get_column();
 }
 
-const SourcePoint& SourceRange::get_end() const {
+const SourcePoint&
+SourceRange::get_end() const {
   return end;
 }
 
-unsigned SourceRange::get_end_line() const {
+unsigned
+SourceRange::get_end_line() const {
   return get_end().get_line();
 }
 
-unsigned SourceRange::get_end_column() const {
+unsigned
+SourceRange::get_end_column() const {
   return get_end().get_column();
 }
 

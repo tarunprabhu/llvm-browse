@@ -6,17 +6,19 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/ModuleSlotTracker.h>
 
+#include <memory>
 #include <vector>
 
+#include "Argument.h"
+#include "BasicBlock.h"
 #include "INavigable.h"
 #include "IWrapper.h"
+#include "Iterator.h"
 #include "Typedefs.h"
 #include "Value.h"
 
 namespace lb {
 
-class Argument;
-class BasicBlock;
 class Comdat;
 class Module;
 
@@ -25,20 +27,25 @@ class alignas(ALIGN_OBJ) Function :
     public INavigable,
     public IWrapper<llvm::Function> {
 protected:
-  std::vector<Argument*> args;
-  std::vector<BasicBlock*> bbs;
-  Comdat* comdat;
+  std::vector<std::unique_ptr<Argument>> m_args;
+  std::vector<std::unique_ptr<BasicBlock>> m_blocks;
+  const Comdat* comdat;
   const llvm::DISubprogram* di;
   std::string source_name;
   std::string full_name;
 
 public:
-  using ArgIterator = decltype(args)::const_iterator;
-  using Iterator    = decltype(bbs)::const_iterator;
+  using ArgIterator   = DerefIterator<decltype(m_args)::const_iterator>;
+  using BlockIterator = DerefIterator<decltype(m_blocks)::const_iterator>;
+
+protected:
+  Function(const llvm::Function& llvm_f, Module& module);
 
 public:
-  Function(llvm::Function& llvm_f, Module& module);
-  virtual ~Function() = default;
+  Function()           = delete;
+  Function(Function&)  = delete;
+  Function(Function&&) = delete;
+  virtual ~Function()  = default;
 
   bool has_source_info() const;
   bool has_source_name() const;
@@ -62,9 +69,9 @@ public:
   Argument& get_arg(unsigned i);
   const Argument& get_arg(unsigned i) const;
 
-  Iterator begin() const;
-  Iterator end() const;
-  llvm::iterator_range<Iterator> blocks() const;
+  BlockIterator begin() const;
+  BlockIterator end() const;
+  llvm::iterator_range<BlockIterator> blocks() const;
   ArgIterator arg_begin() const;
   ArgIterator arg_end() const;
   llvm::iterator_range<ArgIterator> arguments() const;
@@ -77,6 +84,14 @@ public:
   static bool classof(const INavigable* v) {
     return v->get_kind() == EntityKind::Function;
   }
+
+  static Function& make(const llvm::Function& llvm_f, Module& module);
+
+public:
+  friend Argument&
+  Argument::make(const llvm::Argument& llvm_a, Function& f, Module& module);
+  friend BasicBlock&
+  BasicBlock::make(const llvm::BasicBlock&, Function& f, Module& module);
 };
 
 } // namespace lb

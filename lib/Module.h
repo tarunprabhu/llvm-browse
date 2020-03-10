@@ -2,32 +2,32 @@
 #define LLVM_BROWSE_MODULE_H
 
 #include <llvm/ADT/iterator_range.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/ModuleSlotTracker.h>
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <map>
+#include <memory>
 #include <vector>
 
+#include "Argument.h"
+#include "BasicBlock.h"
 #include "Comdat.h"
+#include "Definition.h"
 #include "Errors.h"
+#include "Function.h"
+#include "GlobalAlias.h"
+#include "GlobalVariable.h"
+#include "Instruction.h"
+#include "Iterator.h"
 #include "LLVMRange.h"
 #include "MDNode.h"
 #include "Parser.h"
 #include "StructType.h"
 #include "Typedefs.h"
-#include "Value.h"
+#include "Use.h"
 
 namespace lb {
-
-class Argument;
-class BasicBlock;
-class Instruction;
-class Function;
-class GlobalAlias;
-class GlobalVariable;
-class INavigable;
-class Value;
 
 // Wrapper class around an LLVM module. The wrappers around the LLVM classes
 // contains "LLVM source code" information, mainly just line and column
@@ -41,21 +41,27 @@ protected:
   // the object but will never be touched directly
   std::unique_ptr<llvm::LLVMContext> context;
   std::unique_ptr<llvm::Module> llvm;
-  std::vector<std::unique_ptr<Comdat>> comdat_ptrs;
-  std::vector<std::unique_ptr<Value>> value_ptrs;
-  std::vector<std::unique_ptr<MDNode>> mdnode_ptrs;
-  std::vector<std::unique_ptr<StructType>> struct_ptrs;
-  std::vector<std::unique_ptr<Use>> use_ptrs;
-  std::vector<std::unique_ptr<Definition>> def_ptrs;
   std::unique_ptr<llvm::MemoryBuffer> buffer;
 
-  // When looking up anything, these will be actually returned
-  std::vector<const Comdat*> m_comdats;
-  std::vector<const Function*> m_functions;
-  std::vector<const GlobalVariable*> m_globals;
-  std::vector<const GlobalAlias*> m_aliases;
-  std::vector<const MDNode*> m_metadata;
-  std::vector<const StructType*> m_structs;
+  // These are all the objects that the module owns. Not all are directly
+  // exposed from here Everything in these arrays
+  // needs to be freed in the destructor. At some point, I'll create an
+  // iterator that exposes a reference to these instead of the pointer
+  std::vector<std::unique_ptr<GlobalAlias>> m_aliases;
+  std::vector<std::unique_ptr<Comdat>> m_comdats;
+  std::vector<std::unique_ptr<Function>> m_functions;
+  std::vector<std::unique_ptr<GlobalVariable>> m_globals;
+  std::vector<std::unique_ptr<MDNode>> m_metadata;
+  std::vector<std::unique_ptr<StructType>> m_structs;
+
+  // The uses are guaranteed not to overlap and are sorted in the order in
+  // which they appear in the IR
+  std::vector<std::unique_ptr<Use>> uses;
+
+  // These are the definitions of the Navigable entities in the IR.
+  // These are guaranteed not to overlap and are sorted in the order in
+  // which they appear in the IR
+  std::vector<std::unique_ptr<Definition>> defs;
 
   // Wrapper lookup maps
   std::map<const llvm::Comdat*, Comdat*> cmap;
@@ -63,31 +69,17 @@ protected:
   std::map<llvm::StructType*, StructType*> tmap;
   std::map<const llvm::Value*, Value*> vmap;
 
-  // Navigation maps
-
-  // FIXME: It's really stupid to have copies of the vectors with raw pointers
-  // instead of the unique_ptrs. Really should fix it at some point
-
-  // The uses are guaranteed not to overlap and are sorted in the order in 
-  // which they appear in the IR
-  std::vector<const Use*> uses;
-
-  // These are the definitions of the Navigable entities in the IR. 
-  // These are guaranteed not to overlap and are sorted in the order in 
-  // which they appear in the IR 
-  std::vector<const Definition*> defns;
-
-  // There are the functions in the module and are sorted 
-  // in order of appearance in the IR.
-  std::vector<const Function*> func_spans;
-
 public:
-  using AliasIterator    = decltype(m_aliases)::const_iterator;
-  using ComdatIterator   = decltype(m_comdats)::const_iterator;
-  using FunctionIterator = decltype(m_functions)::const_iterator;
-  using GlobalIterator   = decltype(m_globals)::const_iterator;
-  using MetadataIterator = decltype(m_metadata)::const_iterator;
-  using StructIterator   = decltype(m_structs)::const_iterator;
+  using AliasIterator    = DerefIterator<decltype(m_aliases)::const_iterator>;
+  using ComdatIterator   = DerefIterator<decltype(m_comdats)::const_iterator>;
+  using FunctionIterator = DerefIterator<decltype(m_functions)::const_iterator>;
+  using GlobalIterator   = DerefIterator<decltype(m_globals)::const_iterator>;
+  using MetadataIterator = DerefIterator<decltype(m_metadata)::const_iterator>;
+  using StructIterator   = DerefIterator<decltype(m_structs)::const_iterator>;
+  using UseIterator      = DerefIterator<decltype(uses)::iterator>;
+  using UseConstIterator = DerefIterator<decltype(uses)::const_iterator>;
+  using DefIterator      = DerefIterator<decltype(defs)::iterator>;
+  using DefConstIterator = DerefIterator<decltype(defs)::const_iterator>;
 
 protected:
   Module(std::unique_ptr<llvm::Module> module,
@@ -114,52 +106,11 @@ protected:
     return llvm::cast<T>(vmap.at(llvm));
   }
 
-  template<typename T,
-           typename LLVM,
-           typename... ArgsT,
-           std::enable_if_t<!std::is_pointer<LLVM>::value, int> = 0>
-  T& add(LLVM& llvm, ArgsT&&... args) {
-    T* ptr = new T(llvm, args..., *this);
-    value_ptrs.emplace_back(ptr);
-    vmap[&llvm] = ptr;
-    return *ptr;
-  }
+  void sort();
 
-  void sort_uses();
-  void sort_definitions();
-  void sort_func_spans();
-
-  bool check_range(uint64_t begin, uint64_t end, llvm::StringRef tag) const;
+  bool check_range(Offset begin, Offset end, llvm::StringRef tag) const;
   bool check_uses(const INavigable& navigable) const;
   bool check_navigable(const INavigable& navigable) const;
-
-public:
-  Module(const Module&)  = delete;
-  Module(const Module&&) = delete;
-  virtual ~Module()      = default;
-
-  bool contains(const llvm::Value& llvm) const;
-  bool contains(const llvm::MDNode& llvm) const;
-
-  llvm::MemoryBufferRef get_code_buffer() const;
-  llvm::StringRef get_code() const;
-
-  // These should be refactored at some point so they are not public
-  Argument& add(llvm::Argument& llvm, Function& f);
-  BasicBlock& add(llvm::BasicBlock& llvm, Function& f);
-  Comdat& add(llvm::Comdat&, llvm::GlobalObject& g);
-  Function& add(llvm::Function& llvm);
-  GlobalAlias& add(llvm::GlobalAlias& llvm);
-  GlobalVariable& add(llvm::GlobalVariable& llvm);
-  Instruction& add(llvm::Instruction& llvm, Function& f);
-  MDNode& add(llvm::MDNode& llvm, unsigned slot);
-  StructType& add(llvm::StructType* llvm);
-  Use& add_use(uint64_t begin,
-               uint64_t end,
-               const INavigable& value,
-               const Instruction* inst = nullptr);
-  Definition&
-  add_definition(uint64_t begin, uint64_t end, const INavigable& defined);
 
   Argument& get(const llvm::Argument& llvm);
   BasicBlock& get(const llvm::BasicBlock& llvm);
@@ -172,7 +123,18 @@ public:
   StructType& get(llvm::StructType* llvm);
   Value& get(const llvm::Value& llvm);
 
-  const StructType& get(llvm::StructType* llvm) const;
+public:
+  Module()               = delete;
+  Module(const Module&)  = delete;
+  Module(const Module&&) = delete;
+  virtual ~Module()      = default;
+
+  bool contains(const llvm::Value& llvm) const;
+  bool contains(const llvm::MDNode& llvm) const;
+
+  llvm::MemoryBufferRef get_code_buffer() const;
+  llvm::StringRef get_code() const;
+
   const Argument& get(const llvm::Argument& llvm) const;
   const BasicBlock& get(const llvm::BasicBlock& llvm) const;
   const Comdat& get(const llvm::Comdat& llvm) const;
@@ -182,6 +144,7 @@ public:
   const GlobalVariable& get(const llvm::GlobalVariable& llvm) const;
   const MDNode& get(const llvm::MDNode& llvm) const;
   const Value& get(const llvm::Value& llvm) const;
+  const StructType& get(llvm::StructType* llvm) const;
 
   llvm::iterator_range<AliasIterator> aliases() const;
   llvm::iterator_range<ComdatIterator> comdats() const;
@@ -197,11 +160,12 @@ public:
   unsigned get_num_metadata() const;
   unsigned get_num_structs() const;
 
-  const Use* get_use_at(uint64_t offset) const;
-  const Definition* get_definition_at(uint64_t offset) const;
-  const Instruction* get_instruction_at(uint64_t offset) const;
-  const BasicBlock* get_block_at(uint64_t offset) const;
-  const Function* get_function_at(uint64_t offset) const;
+  const Use* get_use_at(Offset offset) const;
+  const Definition* get_definition_at(Offset offset) const;
+  const Instruction* get_instruction_at(Offset offset) const;
+  const BasicBlock* get_block_at(Offset offset) const;
+  const Function* get_function_at(Offset offset) const;
+  const Comdat* get_comdat_at(Offset offset) const;
 
   llvm::Module& get_llvm();
   const llvm::Module& get_llvm() const;
@@ -215,6 +179,40 @@ public:
 
 public:
   static std::unique_ptr<const Module> create(const std::string& file);
+
+public:
+  friend class Parser;
+  friend Argument&
+  Argument::make(const llvm::Argument& llvm_a, Function& f, Module& module);
+  friend BasicBlock& BasicBlock::make(const llvm::BasicBlock& llvm_bb,
+                                      Function& f,
+                                      Module& module);
+  friend Comdat& Comdat::make(const llvm::Comdat& llvm_c,
+                              const llvm::GlobalObject& target,
+                              Module& module);
+  friend Function& Function::make(const llvm::Function& llvm_f, Module& module);
+  friend GlobalAlias& GlobalAlias::make(const llvm::GlobalAlias& llvm_a,
+                                        Module& module);
+  friend GlobalVariable&
+  GlobalVariable::make(const llvm::GlobalVariable& llvm_g, Module& module);
+  friend Instruction& Instruction::make(const llvm::Instruction& llvm_i,
+                                        BasicBlock& bb,
+                                        Function& f,
+                                        Module& module);
+  friend MDNode&
+  MDNode::make(const llvm::MDNode& llvm_md, unsigned slot, Module& module);
+  friend StructType& StructType::make(llvm::StructType* llvm_sty,
+                                      Module& module);
+
+  friend Use& Use::make(Offset begin,
+                        Offset end,
+                        const INavigable& value,
+                        Module& module,
+                        const Instruction* inst);
+  friend Definition& Definition::make(Offset begin,
+                                      Offset end,
+                                      const INavigable& defined,
+                                      Module& module);
 };
 
 } // namespace lb

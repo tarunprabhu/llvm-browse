@@ -4,12 +4,13 @@ namespace lb {
 
 namespace String {
 
-  namespace impl {
-    void concat(llvm::raw_string_ostream&) {
-      ;
-    }
+namespace impl {
+void
+concat(llvm::raw_string_ostream&) {
+  ;
+}
 
-  } // namespace impl
+} // namespace impl
 
 } // namespace String
 

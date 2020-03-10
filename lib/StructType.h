@@ -24,9 +24,14 @@ protected:
   std::string source_name;
   std::string full_name;
 
-public:
+protected:
   StructType(llvm::StructType* llvm, Module& module);
-  virtual ~StructType() = default;
+
+public:
+  StructType()             = delete;
+  StructType(StructType&)  = delete;
+  StructType(StructType&&) = delete;
+  virtual ~StructType()    = default;
 
   bool has_source_info() const;
   bool has_source_name() const;
@@ -36,9 +41,11 @@ public:
   bool is_artificial() const;
 
 public:
-	static bool classof(const INavigable* v) {
-		return v->get_kind() == EntityKind::StructType;
-	}
+  static bool classof(const INavigable* v) {
+    return v->get_kind() == EntityKind::StructType;
+  }
+
+  static StructType& make(llvm::StructType* sty, Module& module);
 };
 
 } // namespace lb

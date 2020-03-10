@@ -10,40 +10,62 @@ using llvm::isa;
 
 namespace lb {
 
-Argument::Argument(llvm::Argument& arg, Function& f, Module& module) :
+Argument::Argument(const llvm::Argument& arg, Function& f, Module& module) :
     Value(EntityKind::Argument),
-    INavigable(EntityKind::Argument), IWrapper<llvm::Argument>(arg, module),
+    INavigable(EntityKind::Argument),
+    IWrapper<llvm::Argument>(arg, module),
+    parent(f),
     di(nullptr) {
   ;
 }
 
-void Argument::set_debug_info_node(const llvm::DILocalVariable* di) {
-	this->di = di;
+void
+Argument::set_debug_info_node(const llvm::DILocalVariable* di) {
+  this->di = di;
 }
 
-bool Argument::has_source_info() const {
-	return di;
+bool
+Argument::has_source_info() const {
+  return di;
 }
 
-bool Argument::has_source_name() const {
-	return get_source_name().size();
+bool
+Argument::has_source_name() const {
+  return get_source_name().size();
 }
 
-llvm::StringRef Argument::get_source_name() const {
-	return has_source_info() ? di->getName() : llvm::StringRef("");
+llvm::StringRef
+Argument::get_source_name() const {
+  return has_source_info() ? di->getName() : llvm::StringRef("");
 }
 
-llvm::StringRef Argument::get_llvm_name() const {
-	return get_tag();
+llvm::StringRef
+Argument::get_llvm_name() const {
+  return get_tag();
 }
 
-bool Argument::is_artificial() const {
-	return has_source_info() ? di->isArtificial() : false;
+bool
+Argument::is_artificial() const {
+  return has_source_info() ? di->isArtificial() : false;
+}
+
+Function&
+Argument::get_function() {
+  return parent;
 }
 
 const Function&
 Argument::get_function() const {
-  return get_module().get(*get_llvm().getParent());
+  return parent;
+}
+
+Argument&
+Argument::make(const llvm::Argument& llvm_a, Function& f, Module& module) {
+  auto* arg = new Argument(llvm_a, f, module);
+  f.m_args.emplace_back(arg);
+  module.vmap[&llvm_a] = arg;
+  
+  return *arg;
 }
 
 } // namespace lb

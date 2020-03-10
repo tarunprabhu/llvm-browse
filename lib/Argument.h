@@ -5,13 +5,13 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/ModuleSlotTracker.h>
 
-#include "Function.h"
 #include "INavigable.h"
 #include "IWrapper.h"
 #include "Value.h"
 
 namespace lb {
 
+class Function;
 class Module;
 
 class Argument :
@@ -19,13 +19,20 @@ class Argument :
     public INavigable,
     public IWrapper<llvm::Argument> {
 protected:
-	const llvm::DILocalVariable* di;
+  Function& parent;
+  const llvm::DILocalVariable* di;
+
+protected:
+  Argument(const llvm::Argument& llvm_arg, Function& f, Module& module);
+  Function& get_function();
 
 public:
-  Argument(llvm::Argument& llvm_arg, Function& f, Module& module);
-  virtual ~Argument() = default;
+  Argument()           = delete;
+  Argument(Argument&)  = delete;
+  Argument(Argument&&) = delete;
+  virtual ~Argument()  = default;
 
-	void set_debug_info_node(const llvm::DILocalVariable* di);
+  void set_debug_info_node(const llvm::DILocalVariable* di);
 
   const Function& get_function() const;
   bool has_source_info() const;
@@ -40,8 +47,11 @@ public:
   }
 
   static bool classof(const INavigable* v) {
-  	return v->get_kind() == EntityKind::Argument;
+    return v->get_kind() == EntityKind::Argument;
   }
+
+  static Argument&
+  make(const llvm::Argument& llvm_arg, Function& f, Module& module);
 };
 
 } // namespace lb

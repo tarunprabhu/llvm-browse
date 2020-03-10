@@ -1,8 +1,9 @@
 #include "MDNode.h"
+#include "Module.h"
 
 namespace lb {
 
-MDNode::MDNode(llvm::MDNode& llvm, unsigned slot, Module& module) :
+MDNode::MDNode(const llvm::MDNode& llvm, unsigned slot, Module& module) :
     INavigable(EntityKind::MDNode), IWrapper<llvm::MDNode>(llvm, module) {
   set_tag(slot, "!");
 }
@@ -14,6 +15,15 @@ MDNode::is_artificial() const {
   // belong here anyway, and I doubt that something like that can ever happen
   // anyway
   return true;
+}
+
+MDNode&
+MDNode::make(const llvm::MDNode& llvm_md, unsigned slot, Module& module) {
+  auto* md = new MDNode(llvm_md, slot, module);
+  module.m_metadata.emplace_back(md);
+  module.mmap[&llvm_md] = md;
+
+  return *md;
 }
 
 } // namespace lb

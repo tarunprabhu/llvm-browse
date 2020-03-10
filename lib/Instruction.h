@@ -23,14 +23,24 @@ class Instruction :
     public IWrapper<llvm::Instruction> {
 protected:
   std::vector<SourceRange> ops;
-  bool di;
+  BasicBlock& parent;
+  llvm::DebugLoc di;
 
 public:
   using Iterator = decltype(ops)::const_iterator;
 
+protected:
+  Instruction(const llvm::Instruction& llvm_i,
+              BasicBlock& bb,
+              Function& f,
+              Module& module);
+  BasicBlock& get_block();
+
 public:
-  Instruction(llvm::Instruction& llvm_i, Function& f, Module& module);
-  virtual ~Instruction() = default;
+  Instruction()              = delete;
+  Instruction(Instruction&)  = delete;
+  Instruction(Instruction&&) = delete;
+  virtual ~Instruction()     = default;
 
   void add_operand(const SourceRange& = SourceRange());
 
@@ -51,6 +61,11 @@ public:
   static bool classof(const INavigable* v) {
     return v->get_kind() == EntityKind::Instruction;
   }
+
+  static Instruction& make(const llvm::Instruction& llvm_i,
+                           BasicBlock& bb,
+                           Function& f,
+                           Module& module);
 };
 
 } // namespace lb

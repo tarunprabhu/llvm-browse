@@ -14,17 +14,19 @@ using llvm::isa;
 
 namespace lb {
 
-GlobalVariable::GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module) :
+GlobalVariable::GlobalVariable(const llvm::GlobalVariable& llvm_g,
+                               Module& module) :
     Value(EntityKind::GlobalVariable),
-    INavigable(EntityKind::GlobalVariable), IWrapper<llvm::GlobalVariable>(
-                                                llvm_g, module),
-    comdat(nullptr), di(nullptr) {
+    INavigable(EntityKind::GlobalVariable),
+    IWrapper<llvm::GlobalVariable>(llvm_g, module),
+    comdat(nullptr),
+    di(nullptr) {
   if(llvm_g.hasName())
     set_tag(llvm_g.getName(), "@");
   else
     critical() << "Cannot set tag for unnamed global" << llvm_g << "\n";
-  if(llvm::Comdat* llvm_c = llvm_g.getComdat())
-  	comdat = &module.get(*llvm_c);
+  if(const llvm::Comdat* llvm_c = llvm_g.getComdat())
+    comdat = &(static_cast<const Module&>(module).get(*llvm_c));
 
   llvm::SmallVector<llvm::DIGlobalVariableExpression*, 4> dis;
   llvm_g.getDebugInfo(dis);
@@ -32,7 +34,7 @@ GlobalVariable::GlobalVariable(llvm::GlobalVariable& llvm_g, Module& module) :
     di = dis[0]->getVariable();
     set_source_defn(SourceRange(di->getFilename().data(), di->getLine(), 1));
     source_name = DebugInfo::get_name(di);
-    full_name = DebugInfo::get_full_name(di);
+    full_name   = DebugInfo::get_full_name(di);
   } else if(dis.size() > 1) {
     warning() << "Could not find unique debug info for global: " << llvm_g
               << "\n";
@@ -46,7 +48,7 @@ GlobalVariable::has_source_info() const {
 
 bool
 GlobalVariable::has_source_name() const {
-	return get_source_name().size();
+  return get_source_name().size();
 }
 
 bool
@@ -56,7 +58,7 @@ GlobalVariable::has_full_name() const {
 
 llvm::StringRef
 GlobalVariable::get_source_name() const {
-	return llvm::StringRef(source_name);
+  return llvm::StringRef(source_name);
 }
 
 llvm::StringRef
@@ -71,19 +73,28 @@ GlobalVariable::get_full_name() const {
 
 const Comdat*
 GlobalVariable::get_comdat() const {
-	return comdat;
+  return comdat;
 }
 
 bool
 GlobalVariable::is_artificial() const {
-	return get_llvm().hasGlobalUnnamedAddr();
+  return get_llvm().hasGlobalUnnamedAddr();
 }
 
-bool 
+bool
 GlobalVariable::is_mangled() const {
-	if(has_source_name())
-		return get_source_name().size() != get_llvm_name().size();
-	return false;
+  if(has_source_name())
+    return get_source_name().size() != get_llvm_name().size();
+  return false;
+}
+
+GlobalVariable&
+GlobalVariable::make(const llvm::GlobalVariable& llvm_g, Module& module) {
+  auto* global = new GlobalVariable(llvm_g, module);
+  module.m_globals.emplace_back(global);
+  module.vmap[&llvm_g] = global;
+
+  return *global;
 }
 
 } // namespace lb

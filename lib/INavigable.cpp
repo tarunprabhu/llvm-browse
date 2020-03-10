@@ -15,7 +15,8 @@ INavigable::INavigable(EntityKind kind) : kind(kind), llvm_defn(nullptr) {
   ;
 }
 
-EntityKind INavigable::get_kind() const {
+EntityKind
+INavigable::get_kind() const {
   return kind;
 }
 
@@ -103,19 +104,23 @@ INavigable::get_num_uses() const {
   return m_uses.size();
 }
 
-bool INavigable::has_llvm_defn() const {
+bool
+INavigable::has_llvm_defn() const {
   return llvm_defn;
 }
 
-bool INavigable::has_llvm_span() const {
+bool
+INavigable::has_llvm_span() const {
   return llvm_span;
 }
 
-bool INavigable::has_source_defn() const {
+bool
+INavigable::has_source_defn() const {
   return source_defn;
 }
 
-bool INavigable::has_source_span() const {
+bool
+INavigable::has_source_span() const {
   return source_span;
 }
 
@@ -139,4 +144,3 @@ INavigable::get_source_span() const {
 }
 
 } // namespace lb
-  
