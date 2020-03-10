@@ -3,6 +3,7 @@
 
 #include "lib/Argument.h"
 #include "lib/BasicBlock.h"
+#include "lib/Comdat.h"
 #include "lib/Definition.h"
 #include "lib/Function.h"
 #include "lib/GlobalAlias.h"
@@ -15,14 +16,16 @@
 #include "lib/Use.h"
 
 #include <llvm/ADT/iterator_range.h>
+#include <llvm/Support/Casting.h>
 
 #include <cstdio>
 #include <type_traits>
 
-using Handle = uint64_t;
+using llvm::isa;
+using llvm::cast;
+using llvm::dyn_cast;
 
-// Invalid handle
-static const int HANDLE_NULL = 0;
+// Typedefs
 
 // The tags are added to the Handle to be able to determine the dynamic type
 // of the object from the handle
@@ -40,22 +43,59 @@ enum class HandleKind {
   Mask           = 0xf,
 };
 
+using Handle = uint64_t;
+
+// Invalid handle
+static const int HANDLE_NULL = 0;
+
 template<typename T, std::enable_if_t<!std::is_pointer<T>::value, int> = 0>
 static Handle
-get_handle(const T* ptr, HandleKind tag) {
-  return reinterpret_cast<Handle>(ptr) | static_cast<Handle>(tag);
+get_handle(const T& ptr, HandleKind tag) {
+  return reinterpret_cast<Handle>(&ptr) | static_cast<Handle>(tag);
 }
 
 template<typename T, std::enable_if_t<!std::is_pointer<T>::value, int> = 0>
 static PyObject*
-get_py_handle(const T* ptr, HandleKind tag) {
+get_py_handle(const T& ptr, HandleKind tag) {
   return PyLong_FromLong(get_handle(ptr, tag));
 }
 
+static PyObject*
+get_py_handle(const lb::INavigable* v) {
+  if(const auto* alias = dyn_cast<lb::GlobalAlias>(v))
+    return get_py_handle(*alias, HandleKind::GlobalAlias);
+  else if(const auto* arg = dyn_cast<lb::Argument>(v))
+    return get_py_handle(*arg, HandleKind::Argument);
+  else if(const auto* bb = dyn_cast<lb::BasicBlock>(v))
+    return get_py_handle(*bb, HandleKind::BasicBlock);
+  else if(const auto* comdat = dyn_cast<lb::Comdat>(v))
+    return get_py_handle(*comdat, HandleKind::Comdat);
+  else if(const auto* f = dyn_cast<lb::Function>(v))
+    return get_py_handle(*f, HandleKind::Function);
+  else if(const auto* g = dyn_cast<lb::GlobalVariable>(v))
+    return get_py_handle(*g, HandleKind::GlobalVariable);
+  else if(const auto* inst = dyn_cast<lb::Instruction>(v))
+    return get_py_handle(*inst, HandleKind::Instruction);
+  else if(const auto* md = dyn_cast<lb::MDNode>(v))
+    return get_py_handle(*md, HandleKind::MDNode);
+  else if(const auto* s = dyn_cast<lb::StructType>(v))
+    return get_py_handle(*s, HandleKind::StructType);
+  else
+    lb::error() << "Cannot get handle: " << static_cast<int>(v->get_kind())
+                << "\n";
+
+  return nullptr;
+}
+
+static PyObject*
+get_py_handle() {
+  return PyLong_FromLong(HANDLE_NULL);
+}
+
 template<typename T>
-static T*
+static const T&
 get_object(Handle handle) {
-  return reinterpret_cast<T*>(handle & ~static_cast<Handle>(HandleKind::Mask));
+  return *reinterpret_cast<T*>(handle & ~static_cast<Handle>(HandleKind::Mask));
 }
 
 static HandleKind
@@ -241,7 +281,7 @@ convert(llvm::iterator_range<lb::INavigable::Iterator> uses) {
 
 static PyObject*
 get_null_handle(PyObject* self, PyObject* args) {
-  return PyLong_FromLong(HANDLE_NULL);
+  return get_py_handle();
 }
 
 static PyObject*
@@ -309,19 +349,19 @@ module_create(PyObject* self, PyObject* args) {
   // own this, so we just release it from the returned pointer and hand
   // the pointer off to the caller. It is the caller's responsibilty to
   // call lb_module_free() to release the Module
-  return get_py_handle(lb::Module::create(file).release(), HandleKind::Module);
+  return get_py_handle(*lb::Module::create(file).release(), HandleKind::Module);
 }
 
 static PyObject*
 module_get_code(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Module>(parse_handle(args))->get_code());
+  return convert(get_object<lb::Module>(parse_handle(args)).get_code());
 }
 
 static PyObject*
 module_get_aliases(PyObject* self, PyObject* args) {
-  const lb::Module* module = get_object<lb::Module>(parse_handle(args));
+  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
   PyObject* aliases        = PyList_New(0);
-  for(const lb::GlobalAlias* alias : module->aliases())
+  for(const lb::GlobalAlias& alias : module.aliases())
     PyList_Append(aliases, get_py_handle(alias, HandleKind::GlobalAlias));
 
   Py_INCREF(aliases);
@@ -330,9 +370,9 @@ module_get_aliases(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_comdats(PyObject* self, PyObject* args) {
-  const lb::Module* module = get_object<lb::Module>(parse_handle(args));
+  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
   PyObject* comdats        = PyList_New(0);
-  for(const lb::Comdat* comdat : module->comdats())
+  for(const lb::Comdat& comdat : module.comdats())
     PyList_Append(comdats, get_py_handle(comdat, HandleKind::Comdat));
 
   Py_INCREF(comdats);
@@ -341,9 +381,9 @@ module_get_comdats(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_functions(PyObject* self, PyObject* args) {
-  const lb::Module* module = get_object<lb::Module>(parse_handle(args));
+  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
   PyObject* functions      = PyList_New(0);
-  for(const lb::Function* f : module->functions())
+  for(const lb::Function& f : module.functions())
     PyList_Append(functions, get_py_handle(f, HandleKind::Function));
 
   Py_INCREF(functions);
@@ -352,9 +392,9 @@ module_get_functions(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_globals(PyObject* self, PyObject* args) {
-  const lb::Module* module = get_object<lb::Module>(parse_handle(args));
+  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
   PyObject* globals        = PyList_New(0);
-  for(const lb::GlobalVariable* g : module->globals())
+  for(const lb::GlobalVariable& g : module.globals())
     PyList_Append(globals, get_py_handle(g, HandleKind::GlobalVariable));
 
   Py_INCREF(globals);
@@ -364,9 +404,9 @@ module_get_globals(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_structs(PyObject* self, PyObject* args) {
 
-  const lb::Module* module = get_object<lb::Module>(parse_handle(args));
+  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
   PyObject* structs        = PyList_New(0);
-  for(const lb::StructType* s : module->structs())
+  for(const lb::StructType& s : module.structs())
     PyList_Append(structs, get_py_handle(s, HandleKind::StructType));
 
   Py_INCREF(structs);
@@ -375,10 +415,75 @@ module_get_structs(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_free(PyObject* self, PyObject* args) {
-  delete get_object<lb::Module>(parse_handle(args));
+  delete &get_object<lb::Module>(parse_handle(args));
 
   Py_INCREF(Py_None);
   return Py_None;
+}
+
+static PyObject*
+module_get_def_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  uint64_t offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::Definition* defn = module.get_definition_at(offset))
+    return get_py_handle(defn->get_defined());
+  return get_py_handle();
+}
+
+static PyObject*
+module_get_use_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  uint64_t offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+  
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::Use* use = module.get_use_at(offset))
+    return get_py_handle(use->get_used());
+  return get_py_handle();
+}
+
+static PyObject*
+module_get_function_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  uint64_t offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::Function* f = module.get_function_at(offset))
+    return get_py_handle(*f, HandleKind::Function);
+  return get_py_handle();
+}
+
+static PyObject*
+module_get_block_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  uint64_t offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::BasicBlock* bb = module.get_block_at(offset))
+    return get_py_handle(*bb, HandleKind::BasicBlock);
+  return get_py_handle();
+}
+
+static PyObject*
+module_get_instruction_at(PyObject* self, PyObject* args) {
+  Handle handle = HANDLE_NULL;
+  uint64_t offset = 0;
+  if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
+    return nullptr;
+
+  const lb::Module& module = get_object<lb::Module>(handle);
+  if(const lb::Instruction* inst = module.get_instruction_at(offset))
+    return get_py_handle(*inst, HandleKind::Instruction);
+  return get_py_handle();
 }
 
 // Alias interface
@@ -386,18 +491,18 @@ module_free(PyObject* self, PyObject* args) {
 static PyObject*
 alias_get_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalAlias>(parse_handle(args))->get_llvm_defn());
+      get_object<lb::GlobalAlias>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 alias_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalAlias>(parse_handle(args))->get_llvm_span());
+      get_object<lb::GlobalAlias>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 alias_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::GlobalAlias>(parse_handle(args))->uses());
+  return convert(get_object<lb::GlobalAlias>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -408,13 +513,13 @@ alias_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 alias_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::GlobalAlias>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::GlobalAlias>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 alias_get_llvm_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalAlias>(parse_handle(args))->get_llvm_name());
+      get_object<lb::GlobalAlias>(parse_handle(args)).get_llvm_name());
 }
 
 static PyObject*
@@ -426,23 +531,23 @@ alias_is_artificial(PyObject* self, PyObject* args) {
 
 static PyObject*
 arg_get_llvm_defn(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->get_llvm_defn());
+  return convert(get_object<lb::Argument>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 arg_get_llvm_span(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->get_llvm_span());
+  return convert(get_object<lb::Argument>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 arg_get_source_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Argument>(parse_handle(args))->get_source_defn());
+      get_object<lb::Argument>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
 arg_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->uses());
+  return convert(get_object<lb::Argument>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -453,23 +558,23 @@ arg_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 arg_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::Argument>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 arg_get_llvm_name(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->get_llvm_name());
+  return convert(get_object<lb::Argument>(parse_handle(args)).get_llvm_name());
 }
 
 static PyObject*
 arg_get_source_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Argument>(parse_handle(args))->get_source_name());
+      get_object<lb::Argument>(parse_handle(args)).get_source_name());
 }
 
 static PyObject*
 arg_is_artificial(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Argument>(parse_handle(args))->is_artificial());
+  return convert(get_object<lb::Argument>(parse_handle(args)).is_artificial());
 }
 
 // Basic block interface
@@ -477,18 +582,18 @@ arg_is_artificial(PyObject* self, PyObject* args) {
 static PyObject*
 block_get_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::BasicBlock>(parse_handle(args))->get_llvm_defn());
+      get_object<lb::BasicBlock>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 block_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::BasicBlock>(parse_handle(args))->get_llvm_span());
+      get_object<lb::BasicBlock>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 block_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::BasicBlock>(parse_handle(args))->uses());
+  return convert(get_object<lb::BasicBlock>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -499,21 +604,21 @@ block_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 block_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::BasicBlock>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::BasicBlock>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 block_is_artificial(PyObject* self, PyObject* args) {
   return convert(get_object<lb::BasicBlock>(parse_handle(args))
-                     ->get_function()
+                     .get_function()
                      .is_artificial());
 }
 
 static PyObject*
 block_get_instructions(PyObject* self, PyObject* args) {
-  const lb::BasicBlock* bb = get_object<lb::BasicBlock>(parse_handle(args));
+  const lb::BasicBlock& bb = get_object<lb::BasicBlock>(parse_handle(args));
   PyObject* insts          = PyList_New(0);
-  for(const lb::Instruction* inst : bb->instructions())
+  for(const lb::Instruction& inst : bb.instructions())
     PyList_Append(insts, get_py_handle(inst, HandleKind::Instruction));
 
   Py_INCREF(insts);
@@ -524,46 +629,46 @@ block_get_instructions(PyObject* self, PyObject* args) {
 
 static PyObject*
 comdat_get_llvm_defn(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Comdat>(parse_handle(args))->get_llvm_defn());
+  return convert(get_object<lb::Comdat>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 comdat_get_self_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Comdat>(parse_handle(args))->get_self_llvm_defn());
+      get_object<lb::Comdat>(parse_handle(args)).get_self_llvm_defn());
 }
 
 static PyObject*
 comdat_get_llvm_span(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Comdat>(parse_handle(args))->get_llvm_span());
+  return convert(get_object<lb::Comdat>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 comdat_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Comdat>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::Comdat>(parse_handle(args)).get_tag());
 }
 
 // Function interface
 
 static PyObject*
 func_get_llvm_defn(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->get_llvm_defn());
+  return convert(get_object<lb::Function>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 func_get_llvm_span(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->get_llvm_span());
+  return convert(get_object<lb::Function>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 func_get_source_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Function>(parse_handle(args))->get_source_defn());
+      get_object<lb::Function>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
 func_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->uses());
+  return convert(get_object<lb::Function>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -574,40 +679,40 @@ func_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::Function>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 func_get_llvm_name(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->get_llvm_name());
+  return convert(get_object<lb::Function>(parse_handle(args)).get_llvm_name());
 }
 
 static PyObject*
 func_get_source_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Function>(parse_handle(args))->get_source_name());
+      get_object<lb::Function>(parse_handle(args)).get_source_name());
 }
 
 static PyObject*
 func_get_full_name(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->get_full_name());
+  return convert(get_object<lb::Function>(parse_handle(args)).get_full_name());
 }
 
 static PyObject*
 func_is_artificial(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->is_artificial());
+  return convert(get_object<lb::Function>(parse_handle(args)).is_artificial());
 }
 
 static PyObject*
 func_is_mangled(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Function>(parse_handle(args))->is_mangled());
+  return convert(get_object<lb::Function>(parse_handle(args)).is_mangled());
 }
 
 static PyObject*
 func_get_args(PyObject* self, PyObject* args) {
-  const lb::Function* f = get_object<lb::Function>(parse_handle(args));
+  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
   PyObject* arguments   = PyList_New(0);
-  for(const lb::Argument* arg : f->arguments())
+  for(const lb::Argument& arg : f.arguments())
     PyList_Append(arguments, get_py_handle(arg, HandleKind::Argument));
 
   Py_INCREF(arguments);
@@ -616,9 +721,9 @@ func_get_args(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_blocks(PyObject* self, PyObject* args) {
-  const lb::Function* f = get_object<lb::Function>(parse_handle(args));
+  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
   PyObject* blocks      = PyList_New(0);
-  for(const lb::BasicBlock* bb : f->blocks())
+  for(const lb::BasicBlock& bb : f.blocks())
     PyList_Append(blocks, get_py_handle(bb, HandleKind::BasicBlock));
 
   Py_INCREF(blocks);
@@ -627,10 +732,10 @@ func_get_blocks(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_comdat(PyObject* self, PyObject* args) {
-  const lb::Function* f = get_object<lb::Function>(parse_handle(args));
-  if(const lb::Comdat* comdat = f->get_comdat())
-    return get_py_handle(comdat, HandleKind::Comdat);
-  return convert(HANDLE_NULL);
+  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
+  if(const lb::Comdat* comdat = f.get_comdat())
+    return get_py_handle(*comdat, HandleKind::Comdat);
+  return get_py_handle();
 }
 
 // Global interface
@@ -638,24 +743,24 @@ func_get_comdat(PyObject* self, PyObject* args) {
 static PyObject*
 global_get_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_llvm_defn());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 global_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_llvm_span());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 global_get_source_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_source_defn());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
 global_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::GlobalVariable>(parse_handle(args))->uses());
+  return convert(get_object<lb::GlobalVariable>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -666,46 +771,46 @@ global_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 global_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::GlobalVariable>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::GlobalVariable>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 global_get_llvm_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_llvm_name());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_llvm_name());
 }
 
 static PyObject*
 global_get_source_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_source_name());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_source_name());
 }
 
 static PyObject*
 global_get_full_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->get_full_name());
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_full_name());
 }
 
 static PyObject*
 global_is_artificial(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->is_artificial());
+      get_object<lb::GlobalVariable>(parse_handle(args)).is_artificial());
 }
 
 static PyObject*
 global_is_mangled(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::GlobalVariable>(parse_handle(args))->is_mangled());
+      get_object<lb::GlobalVariable>(parse_handle(args)).is_mangled());
 }
 
 static PyObject*
 global_get_comdat(PyObject* self, PyObject* args) {
-  const lb::GlobalVariable* g
+  const lb::GlobalVariable& g
       = get_object<lb::GlobalVariable>(parse_handle(args));
-  if(const lb::Comdat* comdat = g->get_comdat())
-    return get_py_handle(comdat, HandleKind::Comdat);
-  return convert(HANDLE_NULL);
+  if(const lb::Comdat* comdat = g.get_comdat())
+    return get_py_handle(*comdat, HandleKind::Comdat);
+  return get_py_handle();
 }
 
 // Instruction interface
@@ -713,24 +818,24 @@ global_get_comdat(PyObject* self, PyObject* args) {
 static PyObject*
 inst_get_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Instruction>(parse_handle(args))->get_llvm_defn());
+      get_object<lb::Instruction>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 inst_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Instruction>(parse_handle(args))->get_llvm_span());
+      get_object<lb::Instruction>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 inst_get_source_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::Instruction>(parse_handle(args))->get_source_defn());
+      get_object<lb::Instruction>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
 inst_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Instruction>(parse_handle(args))->uses());
+  return convert(get_object<lb::Instruction>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -741,13 +846,13 @@ inst_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 inst_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::Instruction>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::Instruction>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 inst_is_artificial(PyObject* self, PyObject* args) {
   return convert(get_object<lb::Instruction>(parse_handle(args))
-                     ->get_function()
+                     .get_function()
                      .is_artificial());
 }
 
@@ -755,17 +860,17 @@ inst_is_artificial(PyObject* self, PyObject* args) {
 
 static PyObject*
 md_get_llvm_defn(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::MDNode>(parse_handle(args))->get_llvm_defn());
+  return convert(get_object<lb::MDNode>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 md_get_llvm_span(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::MDNode>(parse_handle(args))->get_llvm_span());
+  return convert(get_object<lb::MDNode>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 md_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::MDNode>(parse_handle(args))->uses());
+  return convert(get_object<lb::MDNode>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -775,12 +880,12 @@ md_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 md_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::MDNode>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::MDNode>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 md_is_artificial(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::MDNode>(parse_handle(args))->is_artificial());
+  return convert(get_object<lb::MDNode>(parse_handle(args)).is_artificial());
 }
 
 // Struct interface
@@ -788,24 +893,24 @@ md_is_artificial(PyObject* self, PyObject* args) {
 static PyObject*
 struct_get_llvm_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_llvm_defn());
+      get_object<lb::StructType>(parse_handle(args)).get_llvm_defn());
 }
 
 static PyObject*
 struct_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_llvm_span());
+      get_object<lb::StructType>(parse_handle(args)).get_llvm_span());
 }
 
 static PyObject*
 struct_get_source_defn(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_source_defn());
+      get_object<lb::StructType>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
 struct_get_uses(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::StructType>(parse_handle(args))->uses());
+  return convert(get_object<lb::StructType>(parse_handle(args)).uses());
 }
 
 static PyObject*
@@ -817,31 +922,31 @@ struct_get_indirect_uses(PyObject* self, PyObject* args) {
 
 static PyObject*
 struct_get_tag(PyObject* self, PyObject* args) {
-  return convert(get_object<lb::StructType>(parse_handle(args))->get_tag());
+  return convert(get_object<lb::StructType>(parse_handle(args)).get_tag());
 }
 
 static PyObject*
 struct_get_llvm_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_llvm_name());
+      get_object<lb::StructType>(parse_handle(args)).get_llvm_name());
 }
 
 static PyObject*
 struct_get_source_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_source_name());
+      get_object<lb::StructType>(parse_handle(args)).get_source_name());
 }
 
 static PyObject*
 struct_get_full_name(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->get_full_name());
+      get_object<lb::StructType>(parse_handle(args)).get_full_name());
 }
 
 static PyObject*
 struct_is_artificial(PyObject* self, PyObject* args) {
   return convert(
-      get_object<lb::StructType>(parse_handle(args))->is_artificial());
+      get_object<lb::StructType>(parse_handle(args)).is_artificial());
 }
 
 // Generic interface
@@ -1134,6 +1239,13 @@ static PyMethodDef module_methods[] = {
          "A list of handles to the functions in the module"),
     FUNC(module_get_globals, "A list of handles to the globals in the module"),
     FUNC(module_get_structs, "A list of handles to the structs in the module"),
+    FUNC(module_get_def_at, "Gets the definition at the offset or HANDLE_NULL"),
+    FUNC(module_get_use_at, "Gets the use at the offset or HANDLE_NULL"),
+    FUNC(module_get_function_at,
+         "Gets the function at the offset or HANDLE_NULL"),
+    FUNC(module_get_block_at, "Gets the block at the offset or HANDLE_NULL"),
+    FUNC(module_get_instruction_at,
+         "Gets the instruction at the offset or HANDLE_NULL"),
 
     // Alias interface
     FUNC(alias_get_llvm_defn, "LLVM definition range of the alias"),
