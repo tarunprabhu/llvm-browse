@@ -29,6 +29,17 @@ Module::Module(std::unique_ptr<llvm::Module> module,
   ;
 }
 
+llvm::StringRef
+Module::get_full_path(llvm::StringRef dir, llvm::StringRef file) {
+  std::string buf;
+  llvm::raw_string_ostream ss(buf);
+  if(dir.size())
+    ss << dir << "/";
+  ss << file;
+  auto it = files.insert(ss.str()).first;
+  return llvm::StringRef(*it);
+}
+
 bool
 Module::contains(const llvm::Value& llvm) const {
   return vmap.find(&llvm) != vmap.end();

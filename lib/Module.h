@@ -8,6 +8,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "Argument.h"
@@ -73,6 +74,15 @@ protected:
   std::map<llvm::StructType*, StructType*> tmap;
   std::map<const llvm::Value*, Value*> vmap;
 
+  // The file names seen in the source
+  // We want to keep this because the debug information is not consistent 
+  // in the use of getFilename() and getDirectory(). In some cases, 
+  // getFilename() returns just the filename but in others, it returns the 
+  // full path to the file. So we keep strings of all the filenames here 
+  // so we can return llvm::StringRef where needed instead of copying the 
+  // same string for every SourceRange object
+  std::set<std::string> files;
+
 public:
   using AliasIterator    = DerefIterator<decltype(m_aliases)::const_iterator>;
   using ComdatIterator   = DerefIterator<decltype(m_comdats)::const_iterator>;
@@ -134,6 +144,7 @@ public:
   Module(const Module&&) = delete;
   virtual ~Module()      = default;
 
+  llvm::StringRef get_full_path(llvm::StringRef dir, llvm::StringRef file);
   bool contains(const llvm::Value& llvm) const;
   bool contains(const llvm::MDNode& llvm) const;
 

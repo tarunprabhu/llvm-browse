@@ -25,6 +25,11 @@ Comdat::set_self_llvm_defn(const LLVMRange& defn) {
   self_defn = defn;
 }
 
+llvm::StringRef
+Comdat::get_llvm_name() const {
+  return get_llvm().getName();
+}
+
 const LLVMRange&
 Comdat::get_self_llvm_defn() const {
   return self_defn;

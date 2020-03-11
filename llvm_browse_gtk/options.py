@@ -55,6 +55,12 @@ class Options(GObject.GObject):
         nick='window-maximized',
         blurb='The window state on startup')
 
+    max_marks = GObject.Property(
+        type=int,
+        default=1024,
+        nick='max-marks',
+        blurb='The maximum number of marks that can be added')
+
     @classmethod
     def get_properties(cls) -> List[GObject.Property]:
         return [p for p in cls.__dict__.values()

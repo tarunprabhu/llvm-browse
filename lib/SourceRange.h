@@ -4,6 +4,8 @@
 #include "SourcePoint.h"
 #include "Typedefs.h"
 
+#include <llvm/ADT/StringRef.h>
+
 namespace lb {
 
 // Represents a range in the source file. This is separate from an LLVMRange
@@ -19,8 +21,8 @@ protected:
 
 public:
   SourceRange();
-  SourceRange(const char* file, unsigned begin_line, unsigned begin_col);
-  SourceRange(const char* file,
+  SourceRange(llvm::StringRef file, unsigned begin_line, unsigned begin_col);
+  SourceRange(llvm::StringRef file,
               unsigned begin_line,
               unsigned begin_col,
               unsigned end_line,

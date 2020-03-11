@@ -44,6 +44,7 @@ public:
   InstIterator end() const;
   llvm::iterator_range<InstIterator> instructions() const;
   const Function& get_function() const;
+  bool has_source_info() const;
 
 public:
   static bool classof(const Value* v) {

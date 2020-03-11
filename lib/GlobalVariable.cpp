@@ -32,7 +32,10 @@ GlobalVariable::GlobalVariable(const llvm::GlobalVariable& llvm_g,
   llvm_g.getDebugInfo(dis);
   if(dis.size() == 1) {
     di = dis[0]->getVariable();
-    set_source_defn(SourceRange(di->getFilename().data(), di->getLine(), 1));
+    set_source_defn(
+        SourceRange(module.get_full_path(di->getDirectory(), di->getFilename()),
+                    di->getLine(),
+                    1));
     source_name = DebugInfo::get_name(di);
     full_name   = DebugInfo::get_full_name(di);
   } else if(dis.size() > 1) {

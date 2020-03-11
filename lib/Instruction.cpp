@@ -27,8 +27,10 @@ Instruction::Instruction(const llvm::Instruction& llvm_i,
     di(llvm_i.getDebugLoc()) {
   if(di) {
     if(const auto* scope = dyn_cast<llvm::DIScope>(di.getScope())) {
-      SourceRange defn
-          = SourceRange(scope->getFilename().data(), di.getLine(), di.getCol());
+      SourceRange defn = SourceRange(
+          module.get_full_path(scope->getDirectory(), scope->getFilename()),
+          di.getLine(),
+          di.getCol());
       set_source_defn(defn);
       // The calls to LLVM's debug metadata intrinsics sometimes contain more
       // accurate location information than the DI nodes themselves. So if we

@@ -501,7 +501,9 @@
   <object class="GtkTreeModelSort" id="trsrt_contents">
     <property name="model">trfltr_contents</property>
   </object>
-  <object class="GtkTextBuffer" id="txtbuf_llvm"/>
+  <object class="GtkTextBuffer" id="txtbuf_llvm">
+    <signal name="notify::cursor-position" handler="on_cursor_moved" swapped="no"/>
+  </object>
   <object class="GtkApplicationWindow" id="win_main">
     <property name="can_focus">False</property>
     <property name="default_width">660</property>
@@ -618,7 +620,7 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkCheckMenuItem" id="mitm_view_contents">
+                      <object class="GtkCheckMenuItem" id="mitm_view_contents_pane">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">_Contents</property>
@@ -627,7 +629,7 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkCheckMenuItem" id="mitm_view_source">
+                      <object class="GtkCheckMenuItem" id="mitm_view_source_pane">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">_Source</property>
@@ -717,6 +719,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_goto_definition">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">_Definition</property>
                         <property name="use_underline">True</property>
@@ -727,6 +730,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_goto_prev_use">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">_Previous Use</property>
                         <property name="use_underline">True</property>
@@ -737,6 +741,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_goto_next_use">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">_Next Use</property>
                         <property name="use_underline">True</property>
@@ -752,6 +757,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_go_back">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Go to previous cursor position</property>
                         <property name="label" translatable="yes">_Back</property>
@@ -763,12 +769,23 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_go_forward">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Go to next cursor position</property>
                         <property name="label" translatable="yes">_Forward</property>
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="on_go_forward" swapped="no"/>
                         <accelerator key="F4" signal="activate"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mitm_view_source">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Show source</property>
+                        <property name="label" translatable="yes">Sho_w source</property>
+                        <property name="use_underline">True</property>
+                        <accelerator key="F12" signal="activate"/>
                       </object>
                     </child>
                     <child>
@@ -966,14 +983,15 @@
               </packing>
             </child>
             <child>
-              <object class="GtkToggleToolButton" id="tlbtn_source">
+              <object class="GtkToolButton" id="tlbtn_source">
                 <property name="visible">True</property>
+                <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
                 <property name="tooltip_text" translatable="yes">Show/hide source</property>
                 <property name="label" translatable="yes">_Source</property>
                 <property name="use_underline">True</property>
                 <property name="icon_name">text-x-script</property>
-                <signal name="toggled" handler="on_show_source" swapped="no"/>
+                <signal name="clicked" handler="on_show_source" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -1146,6 +1164,7 @@
                                     <property name="can_focus">True</property>
                                     <property name="editable">False</property>
                                     <property name="buffer">txtbuf_llvm</property>
+                                    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
                                   </object>
                                 </child>
                               </object>
@@ -1208,6 +1227,7 @@
                                 <property name="show_line_numbers">True</property>
                                 <property name="tab_width">4</property>
                                 <property name="smart_home_end">always</property>
+                                <property name="highlight_current_line">True</property>
                               </object>
                             </child>
                           </object>

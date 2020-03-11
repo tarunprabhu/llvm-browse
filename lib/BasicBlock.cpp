@@ -48,6 +48,11 @@ BasicBlock::get_function() const {
   return parent;
 }
 
+bool
+BasicBlock::has_source_info() const {
+  return get_function().has_source_info();
+}
+
 BasicBlock&
 BasicBlock::make(const llvm::BasicBlock& llvm_bb, Function& f, Module& module) {
   auto* bb = new BasicBlock(llvm_bb, f, module);

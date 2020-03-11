@@ -27,116 +27,6 @@ class ModelColsContents(IntEnum):
     Font = 5
 
 
-# This is a tag applied to some range of the text. A tag will correspond to a
-# single entity. There could be several tags that apply at any one source
-# location. Tags may be completely nested within another, but they may not
-# partially overlap
-
-# Base class for the other tags that will be used here
-class LLVMTag(GtkSource.Tag):
-    start = GObject.Property(
-        type=int,
-        default=0,
-        nick='start',
-        blurb='The start offset for this tag')
-
-    end = GObject.Property(
-        type=int,
-        default=0,
-        nick='end',
-        blurb='The end offset for this tag')
-
-    use = GObject.Property(
-        type=GObject.GObject,
-        default=None,
-        nick='use',
-        blurb='The head of the use list for this definition')
-
-    def __init__(self, llvm_range):
-        GtkSource.Tag.__init__(self)
-
-        self.start = llvm_range.begin
-        self.end = llvm_range.end
-
-
-class SourceTag(LLVMTag):
-    file = GObject.Property(
-        type=str,
-        default='',
-        nick='file',
-        blurb='Full path to the source file')
-
-    line = GObject.Property(
-        type=int,
-        default=0,
-        nick='line',
-        blurb='Line number in the source')
-
-    column = GObject.Property(
-        type=int,
-        default=1,
-        nick='column',
-        blurb='Column number within the line')
-
-    def __init__(self, source_defn, llvm_defn):
-        LLVMTag.__init__(self, llvm_defn)
-
-        self.file = source_defn.file
-        self.line = source_defn.begin.line
-        self.column = source_defn.begin.column
-        
-
-class DefinitionTag(LLVMTag):
-    entity = GObject.Property(
-        type=GObject.TYPE_UINT64,
-        default=None,
-        nick='entity',
-        blurb='The entity at this definition')
-
-    source = GObject.Property(
-        type=SourceTag,
-        default=None,
-        nick='source',
-        blurb='The definition might have source information')
-
-    def __init__(self, llvm_range, entity: int):
-        LLVMTag.__init__(self, llvm_range)
-
-        self.entity = entity
-
-
-class UseTag(LLVMTag):
-    defn = GObject.Property(
-        type=DefinitionTag,
-        default=None,
-        nick='defn',
-        blurb='The definition associated with this use')
-
-    prev = GObject.Property(
-        type=LLVMTag,
-        default=None,
-        nick='prev',
-        blurb='The previous use in the chain')
-
-    next = GObject.Property(
-        type=LLVMTag,
-        default=None,
-        nick='next',
-        blurb='The next use in the chain')
-
-    def __init__(self,
-                 llvm_range,
-                 defn: DefinitionTag,
-                 prev: 'UseTag' = None):
-        LLVMTag.__init__(self, llvm_range)
-
-        self.defn = defn
-        self.prev = prev
-        if self.prev:
-            self.prev.next = self
-
-
-
 class UI(GObject.GObject):
     @staticmethod
     def fn_font_filter(family, face) -> bool:
@@ -182,6 +72,7 @@ class UI(GObject.GObject):
         self['dlg_about'].set_icon(icon16)
         self['dlg_about'].set_logo(icon64)
 
+        self.lang_mgr = GtkSource.LanguageManager.get_default()
         self.app = app
         self.options: Options = self.app.options
 
@@ -225,13 +116,14 @@ class UI(GObject.GObject):
                               dst_prop, bidirectional, invert)
 
         bind('font', self['fbtn_options_code'], 'font-desc')
-        # FIXME: We don't use a GtkSource.View for the LLVM because when 
-        # opening a large LLVM (100MB+) file, it becomes too slow to be usable. 
-        # At some point, I'll switch to a custom text view that may be able 
+        # FIXME: We don't use a GtkSource.View for the LLVM because when
+        # opening a large LLVM (100MB+) file, it becomes too slow to be usable.
+        # At some point, I'll switch to a custom text view that may be able
         # to handle large files like that reasonably
         # bind('style', self['srcvw_llvm'].get_buffer(), 'style-scheme')
         # bind('line-nums-llvm', self['srcvw_llvm'], 'show-line-numbers')
         bind('style', self['srcstyl_options_code'], 'style-scheme')
+        bind('style', self.srcbuf_code, 'style-scheme')
         bind('line-nums-llvm', self['chk_options_lines_llvm'], 'active')
         bind('line-nums-source', self['srcvw_source'], 'show-line-numbers')
         bind('line-nums-source', self['chk_options_lines_source'], 'active')
@@ -249,9 +141,9 @@ class UI(GObject.GObject):
         self.options.connect('notify::font', self.on_font_changed)
 
     def _bind_widget_properties(self):
-        self._bind(self['mitm_view_contents'], 'active',
+        self._bind(self['mitm_view_contents_pane'], 'active',
                    self['grd_contents'], 'visible')
-        self._bind(self['mitm_view_source'], 'active',
+        self._bind(self['mitm_view_source_pane'], 'active',
                    self['grd_source'], 'visible')
         self._bind(self['mitm_view_toolbar'], 'active',
                    self['tlbar_main'], 'visible')
@@ -271,18 +163,26 @@ class UI(GObject.GObject):
                        self['tlbtn_close'],
                        self['mitm_search_forward'],
                        self['mitm_search_backward'],
-                       self['mitm_goto_line'],
-                       self['mitm_goto_definition'],
-                       self['tlbtn_goto_definition'],
-                       self['mitm_goto_prev_use'],
+                       self['mitm_goto_line']):
+            bind('module', widget, 'sensitive')
+
+        for widget in (self['tlbtn_source'],
+                       self['mitm_view_source']):
+            bind('entity-with-source', widget, 'sensitive')
+
+        for widget in (self['tlbtn_goto_definition'],
+                       self['mitm_goto_definition']):
+            bind('entity-with-def', widget, 'sensitive')
+
+        for widget in (self['mitm_goto_prev_use'],
                        self['tlbtn_goto_prev_use'],
                        self['mitm_goto_next_use'],
-                       self['tlbtn_goto_next_use'],
-                       self['mitm_go_back'],
-                       self['tlbtn_go_back'],
-                       self['mitm_go_forward'],
-                       self['tlbtn_go_forward']):
-            bind('module', widget, 'sensitive')
+                       self['tlbtn_goto_next_use']):
+            bind('mark-uses-count', widget, 'sensitive')
+    # self['mitm_go_back'],
+    # self['tlbtn_go_back'],
+    # self['mitm_go_forward'],
+    # self['tlbtn_go_forward']):
 
     def fn_contents_sort_names(self,
                                model: Gtk.TreeModel,
@@ -323,10 +223,10 @@ class UI(GObject.GObject):
             self['win_main'].maximize()
 
     # Implementation functions
-    # The callbacks functions could be invoked by different means, either a 
+    # The callbacks functions could be invoked by different means, either a
     # menu click, a keyboard shortcut or may be even implicitly as a result
     # of some other action. The do_* methods implement the actual funtionality
-    # so the callback functions just process the argument as necessary 
+    # so the callback functions just process the argument as necessary
 
     def do_async(self, fn, *args):
         def impl(*args):
@@ -335,17 +235,20 @@ class UI(GObject.GObject):
 
         GLib.idle_add(impl, *args, priority=GLib.PRIORITY_DEFAULT_IDLE)
 
-    def do_entity_select(self, entity: int):
+    def do_scroll_llvm_to_offset(self, offset: int):
         def update_ui(i: Gtk.TreeIter) -> bool:
             self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
             return False
 
-        offset = lb.entity_get_llvm_defn(entity).begin
         off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
         line = off_iter.get_line()
         line_iter = self.srcbuf_llvm.get_iter_at_line(line)
         self.srcbuf_llvm.place_cursor(line_iter)
         self.do_async(update_ui, line_iter)
+
+    def do_entity_select(self, entity: int):
+        offset = lb.entity_get_llvm_defn(entity).begin
+        self.do_scroll_llvm_to_offset(offset)
 
     def do_toggle_expand_row(self, path: Gtk.TreePath):
         if self.trvw_contents.row_expanded(path):
@@ -416,83 +319,46 @@ class UI(GObject.GObject):
 
         self.trvw_contents.set_model(self.trsrt_contents)
 
-    def do_compute_tags(self):
-        def add_tag(tag: LLVMTag) -> LLVMTag:
-            self.tag_table.add(tag)
-            self.srcbuf_llvm.apply_tag(
-                tag,
-                self.srcbuf_llvm.get_iter_at_offset(tag.start),
-                self.srcbuf_llvm.get_iter_at_offset(tag.end))
-
-            return tag
-
-        def add_tags(entity: int, source: bool=True) -> DefinitionTag:
-            llvm_defn = lb.entity_get_llvm_defn(entity)
-            
-            # If we can't get a definition for the entity, don't bother trying 
-            # to mark any uses
-            if llvm_defn:
-                defn_tag = add_tag(DefinitionTag(llvm_defn, entity))
-
-                # The definition should be associated with a span rather than
-                # just the definition, but right now, the spans are not
-                # calculated correctly, so we'll just stick with the definition
-                # for now
-                # FIXME: Set the source tags to the span as well as the 
-                # definition
-                if source:
-                    source_defn = lb.entity_get_source_defn(entity)
-                    if source_defn:
-                        source_tag = add_tag(SourceTag(source_defn, llvm_defn))
-
-                prev_use = None
-                for use in lb.entity_get_uses(entity):
-                    use_tag = add_tag(UseTag(use, defn_tag, prev_use))
-                    prev_use = use_tag
-                    if not defn_tag.use:
-                        defn_tag.use = use_tag
-                return defn_tag
-            return None
-
-        module = self.app.module
-        for f in lb.module_get_functions(module):
-            defn_tag = add_tags(f)
-            for arg in lb.func_get_args(f):
-                add_tags(arg)
-            for bb in lb.func_get_blocks(f):
-                add_tags(bb, source=False)
-                for inst in lb.block_get_instructions(bb):
-                    add_tags(inst)
-            comdat = lb.func_get_comdat(f)
-            if comdat:
-                add_tag(UseTag(lb.comdat_get_self_llvm_defn(comdat), defn_tag))
-
-        for g in lb.module_get_globals(module):
-            defn_tag = add_tags(g)
-            comdat = lb.global_get_comdat(g)
-            if comdat:
-                add_tag(UseTag(lb.comdat_get_self_llvm_defn(comdat), defn_tag))
-
-        for a in lb.module_get_aliases(module):
-            add_tags(a, source=False)
-
     def do_open(self):
         self.srcbuf_llvm.set_text(lb.module_get_code(self.app.module))
 
         self.do_populate_contents()
-        # self.do_compute_tags()
 
-    def do_goto_definition(self, use_tag: UseTag):
-        pass
+    def do_show_source(self, entity: int):
+        def get_source_lang(file: str) -> GtkSource.Language:
+            _, _, ext = file.rpartition('.')
+            if ext in ['c', 'c99', 'c11']:
+                return self.lang_mgr.get_language('c')
+            elif ext in ['cc', 'cpp', 'cxx', 'C', 'CC', 'CPP', 'CXX',
+                         'c++', 'h', 'hh', 'hpp', 'hxx']:
+                return self.lang_mgr.get_language('cpp')
+            elif ext in ['f', 'F', 'fpp', 'f90', 'F90', 'F95', 'f95',
+                         'fort', 'F03', 'f03', 'f08', 'f08']:
+                return self.lang_mgr.get_language('fortran')
+            elif ext in ['cu']:
+                return self.lang_mgr.get_language('cuda')
+            elif ext in ['rs']:
+                return self.lang_mgr.get_language('rst')
+            elif ext in ['objc']:
+                return self.lang_mgr.get_language('objc')
+            else:
+                return None
 
-    def do_goto_prev_use(self, use_tag: UseTag): 
-        pass
+        def update_ui(i: Gtk.TreeIter) -> bool:
+            self.srcvw_code.scroll_to_iter(i, 0.1, True, 0, 0)
+            return False
 
-    def do_goto_next_use(self, use_tag: UseTag):
-        pass
-
-    def do_show_source(self, source_tag: SourceTag):
-        pass
+        src_info = lb.entity_get_source_defn(entity)
+        file = src_info.file
+        line = src_info.begin.line
+        column = src_info.begin.column
+        self.srcbuf_code.set_language(get_source_lang(file))
+        print(file)
+        with open(file, 'r') as f:
+            self.srcbuf_code.set_text(f.read())
+        line_iter = self.srcbuf_code.get_iter_at_line_offset(line-1, column)
+        self.srcbuf_code.place_cursor(line_iter)
+        self.do_async(update_ui, line_iter)
 
     # Callback functions
 
@@ -601,27 +467,66 @@ class UI(GObject.GObject):
         else:
             self.do_toggle_expand_row(path)
 
+    def on_cursor_moved(self, obj: Gtk.TextBuffer, param: GObject.ParamSpec):
+        offset = self.srcbuf_llvm.get_property('cursor-position')
+        entity = lb.module_get_use_at(self.app.module, offset)
+        if not entity:
+            entity = lb.module_get_def_at(self.app.module, offset)
+        if not entity:
+            entity = lb.module_get_comdat_at(self.app.module, offset)
+        self.app.entity = entity
+
+        # If we can find an instruction under the cursor, we don't need to
+        # look for a function because the function can be obtained from
+        # the instruction, but if there is no instruction, we may still be
+        # able to find a function
+        inst = lb.module_get_instruction_at(self.app.module, offset)
+        if inst:
+            self.app.inst = inst
+        else:
+            self.app.func = lb.module_get_function_at(self.app.module, offset)
+
     def on_srcvw_llvm_button(self,
                              srcvw: GtkSource.View,
                              evt: Gdk.EventButton) -> bool:
-        if (evt.type == Gdk.EventType.BUTTON_RELEASE) and (evt.button == 1):
-            x, y = srcvw.window_to_buffer_coords(
-                Gtk.TextWindowType.TEXT, evt.x, evt.y)
-            over_text, i = srcvw.get_iter_at_location(x, y)
-            if over_text:
-                for tag in i.get_tags():
-                    if isinstance(tag, DefinitionTag):
-                        print('Got definition: ', lb.entity_get_source_name(tag.entity))
-                    if isinstance(tag, UseTag):
-                        print('Got use', tag)
-                    if isinstance(tag, SourceTag):
-                        print('Got source', tag.file, tag.line, tag.column)
+        pass
+        # if (evt.type == Gdk.EventType.BUTTON_RELEASE) and (evt.button == 1):
+        #     x, y = srcvw.window_to_buffer_coords(
+        #         Gtk.TextWindowType.TEXT, evt.x, evt.y)
+        #     over_text, i = srcvw.get_iter_at_location(x, y)
+        #     if over_text:
+        #         offset = i.get_offset()
+        #         funcs = [lb.module_get_def_at,
+        #                  lb.module_get_use_at,
+        #                  lb.module_get_comdat_at,
+        #                  lb.module_get_instruction_at,
+        #                  lb.module_get_function_at]
+        #         print(offset, '=>')
+        #         for what, f in zip(['Def', 'Use', 'Comdat', 'Instruction', 'Function'], funcs):
+        #             entity = f(self.app.module, offset)
+        #             if entity:
+        #                 if what == 'Def':
+        #                     print('  ', what, lb.entity_get_kind_name(entity))
+        #                 elif what == 'Use':
+        #                     print('  ', what, lb.entity_get_tag(entity))
+        #                 elif what == 'Comdat':
+        #                     print('  ', what, lb.entity_get_source_name(
+        #                         lb.comdat_get_target(entity)))
+        #                 elif what == 'Instruction':
+        #                     print('  ', what, lb.entity_get_source_defn(entity))
+        #                 elif what == 'Function':
+        #                     print('  ', what, lb.function_get_llvm_name(entity))
+        #                 else:
+        #                     print('  ', what, 'Nothing')
+        #                 break
+
         return False
 
     def on_goto_line(self, *args) -> bool:
         return False
 
     def on_goto_definition(self, *args) -> bool:
+        self.app.action_goto_definition()
         return False
 
     def on_goto_prev_use(self, *args) -> bool:
@@ -637,6 +542,7 @@ class UI(GObject.GObject):
         return False
 
     def on_show_source(self, *args) -> bool:
+        self.app.action_show_source()
         return False
 
     def on_search_forward(self, *args) -> bool:

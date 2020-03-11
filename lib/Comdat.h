@@ -40,6 +40,7 @@ public:
   // definition of the Comdat itself
   void set_self_llvm_defn(const LLVMRange& defn);
 
+  llvm::StringRef get_llvm_name() const;
   const LLVMRange& get_self_llvm_defn() const;
 
   // These will not return any Value. They must be either Function or
