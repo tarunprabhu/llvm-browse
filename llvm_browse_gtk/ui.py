@@ -76,6 +76,9 @@ class UI(GObject.GObject):
         self.app = app
         self.options: Options = self.app.options
 
+        self.srcbuf_llvm.connect(
+            'notify::cursor-position', self.on_cursor_moved)
+
         self._init_widgets()
         self._bind_options()
         self._bind_widget_properties()
@@ -87,7 +90,7 @@ class UI(GObject.GObject):
         return self.builder.get_object(name)
 
     def _init_widgets(self):
-        # self.srcbuf_llvm.set_language(self.mgr_lang.get_language('llvm'))
+        self.srcbuf_llvm.set_language(self.lang_mgr.get_language('llvm'))
         self.trsrt_contents.set_sort_func(1, self.fn_contents_sort_names)
         self.trfltr_contents.set_visible_func(self.fn_contents_filter_names)
         self['fbtn_options_code'].set_filter_func(UI.fn_font_filter)
@@ -115,18 +118,21 @@ class UI(GObject.GObject):
             return self._bind(self.options, src_prop, dst,
                               dst_prop, bidirectional, invert)
 
+        # FIXME: The GtkSource.View because unusable for large LLVM files
+        # (100MB+). At some point, it would be nice to switch to a custom text
+        # view or do some pre-processing so that we can keep the syntax
+        # highlighting even for the really large files
         bind('font', self['fbtn_options_code'], 'font-desc')
-        # FIXME: We don't use a GtkSource.View for the LLVM because when
-        # opening a large LLVM (100MB+) file, it becomes too slow to be usable.
-        # At some point, I'll switch to a custom text view that may be able
-        # to handle large files like that reasonably
-        # bind('style', self['srcvw_llvm'].get_buffer(), 'style-scheme')
-        # bind('line-nums-llvm', self['srcvw_llvm'], 'show-line-numbers')
         bind('style', self['srcstyl_options_code'], 'style-scheme')
-        bind('style', self.srcbuf_code, 'style-scheme')
-        bind('line-nums-llvm', self['chk_options_lines_llvm'], 'active')
+        bind('syntax-llvm', self['swch_options_syntax_llvm'], 'active')
+        bind('style-llvm', self.srcbuf_llvm, 'style-scheme')
+        bind('syntax-source', self['swch_options_syntax_source'], 'active')
+        bind('style-source', self.srcbuf_code, 'style-scheme')
+        bind('line-nums-llvm', self['srcvw_llvm'], 'show-line-numbers')
+        bind('line-nums-llvm', self['swch_options_linenums_llvm'], 'active')
         bind('line-nums-source', self['srcvw_source'], 'show-line-numbers')
-        bind('line-nums-source', self['chk_options_lines_source'], 'active')
+        bind('line-nums-source',
+             self['swch_options_linenums_source'], 'active')
         bind('window-maximized', self['swch_options_maximized'], 'active')
 
         # show-contents and show-source only apply when the application is
@@ -242,12 +248,15 @@ class UI(GObject.GObject):
 
         off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
         line = off_iter.get_line()
-        line_iter = self.srcbuf_llvm.get_iter_at_line(line)
-        self.srcbuf_llvm.place_cursor(line_iter)
+        column = off_iter.get_line_offset() + 1
+        line_iter = self.srcbuf_llvm.get_iter_at_line(line) 
+        col_iter = self.srcbuf_llvm.get_iter_at_line_offset(line, column)
+        self.srcbuf_llvm.place_cursor(col_iter)
         self.do_async(update_ui, line_iter)
 
     def do_entity_select(self, entity: int):
-        offset = lb.entity_get_llvm_defn(entity).begin
+        defn = lb.entity_get_llvm_defn(entity)
+        offset = lb.def_get_begin(defn)
         self.do_scroll_llvm_to_offset(offset)
 
     def do_toggle_expand_row(self, path: Gtk.TreePath):
@@ -350,14 +359,14 @@ class UI(GObject.GObject):
 
         src_info = lb.entity_get_source_defn(entity)
         file = src_info.file
-        line = src_info.begin.line
+        line = src_info.begin.line - 1
         column = src_info.begin.column
         self.srcbuf_code.set_language(get_source_lang(file))
-        print(file)
         with open(file, 'r') as f:
             self.srcbuf_code.set_text(f.read())
-        line_iter = self.srcbuf_code.get_iter_at_line_offset(line-1, column)
-        self.srcbuf_code.place_cursor(line_iter)
+        line_iter = self.srcbuf_code.get_iter_at_line(line)
+        col_iter = self.srcbuf_code.get_iter_at_line_offset(line, column)
+        self.srcbuf_code.place_cursor(col_iter)
         self.do_async(update_ui, line_iter)
 
     # Callback functions
@@ -480,45 +489,9 @@ class UI(GObject.GObject):
         # look for a function because the function can be obtained from
         # the instruction, but if there is no instruction, we may still be
         # able to find a function
-        inst = lb.module_get_instruction_at(self.app.module, offset)
-        if inst:
-            self.app.inst = inst
-        else:
+        self.app.inst = lb.module_get_instruction_at(self.app.module, offset)
+        if not self.app.inst:
             self.app.func = lb.module_get_function_at(self.app.module, offset)
-
-    def on_srcvw_llvm_button(self,
-                             srcvw: GtkSource.View,
-                             evt: Gdk.EventButton) -> bool:
-        pass
-        # if (evt.type == Gdk.EventType.BUTTON_RELEASE) and (evt.button == 1):
-        #     x, y = srcvw.window_to_buffer_coords(
-        #         Gtk.TextWindowType.TEXT, evt.x, evt.y)
-        #     over_text, i = srcvw.get_iter_at_location(x, y)
-        #     if over_text:
-        #         offset = i.get_offset()
-        #         funcs = [lb.module_get_def_at,
-        #                  lb.module_get_use_at,
-        #                  lb.module_get_comdat_at,
-        #                  lb.module_get_instruction_at,
-        #                  lb.module_get_function_at]
-        #         print(offset, '=>')
-        #         for what, f in zip(['Def', 'Use', 'Comdat', 'Instruction', 'Function'], funcs):
-        #             entity = f(self.app.module, offset)
-        #             if entity:
-        #                 if what == 'Def':
-        #                     print('  ', what, lb.entity_get_kind_name(entity))
-        #                 elif what == 'Use':
-        #                     print('  ', what, lb.entity_get_tag(entity))
-        #                 elif what == 'Comdat':
-        #                     print('  ', what, lb.entity_get_source_name(
-        #                         lb.comdat_get_target(entity)))
-        #                 elif what == 'Instruction':
-        #                     print('  ', what, lb.entity_get_source_defn(entity))
-        #                 elif what == 'Function':
-        #                     print('  ', what, lb.function_get_llvm_name(entity))
-        #                 else:
-        #                     print('  ', what, 'Nothing')
-        #                 break
 
         return False
 

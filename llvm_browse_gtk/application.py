@@ -259,49 +259,22 @@ class Application(Gtk.Application):
         if self.entity:
             if lb.is_use(self.entity):
                 self.entity_with_def = lb.use_get_used(self.entity)
-                print('use:', lb.entity_get_tag(lb.use_get_used(self.entity)))
             elif lb.is_def(self.entity):
                 self.entity_with_def = lb.get_null_handle()
-                print('def:', lb.entity_get_tag(
-                    lb.def_get_defined(self.entity)))
             elif lb.is_comdat(self.entity):
                 self.entity_with_def = self.entity
-                print('comdat:', lb.comdat_get_tag(self.entity))
-        # if lb.is_null_handle(self.entity):
-        #     self.entity_is_use = False
-        #     self.entity_is_def = False
-        # elif lb.is_use(self.entity):
-        #     self.entity_is_use = True
-        #     inst = lb.use_get_instruction(self.entity)
-        #     if inst:
-        #         self.curr_inst = inst
-        #     else:
-        #         self.curr_inst = lb.get_null_handle()
-        # elif lb.is_def(self.entity):
-        #     self.entity_is_def = False
-        #     defined = lb.def_get_defined(self.entity)
-        #     if defined and lb.entity_is_instruction(defined):
-        #         self.curr_inst = defined
-        #     else:
-        #         self.curr_inst = lb.get_null_handle()
 
     def on_instruction_changed(self, *args):
         if self.inst:
-            print('inst:', lb.inst_get_tag(self.inst))
             if lb.inst_has_source_info(self.inst):
                 self.entity_with_source = self.inst
             self.func = lb.inst_get_function(self.inst)
-        # if self.curr_inst:
-        #     self.curr_inst_has_source = lb.inst_has_source_info(self.curr_inst)
-        # else:
-        #     self.curr_inst_has_source = False
 
     def on_function_changed(self, *args):
         if self.func:
             if not self.inst:
                 if lb.func_has_source_info(self.func):
                     self.entity_with_source = self.func
-            print('func:', lb.func_get_tag(self.func))
 
     def run(self, argv: argparse.Namespace) -> int:
         self.argv = argv

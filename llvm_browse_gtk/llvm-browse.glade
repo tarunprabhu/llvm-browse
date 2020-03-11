@@ -154,20 +154,6 @@
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkLabel" id="lbl_options_code_lines">
-                                <property name="visible">True</property>
-                                <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">_Line numbers</property>
-                                <property name="use_underline">True</property>
-                                <property name="track_visited_links">False</property>
-                                <property name="xalign">0</property>
-                              </object>
-                              <packing>
-                                <property name="left_attach">0</property>
-                                <property name="top_attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
                               <object class="GtkFontButton" id="fbtn_options_code">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
@@ -181,6 +167,7 @@
                               <packing>
                                 <property name="left_attach">1</property>
                                 <property name="top_attach">0</property>
+                                <property name="width">2</property>
                               </packing>
                             </child>
                             <child>
@@ -194,16 +181,18 @@
                               <packing>
                                 <property name="left_attach">1</property>
                                 <property name="top_attach">1</property>
+                                <property name="width">2</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkCheckButton" id="chk_options_lines_llvm">
-                                <property name="label" translatable="yes">_LLVM</property>
+                              <object class="GtkLabel" id="lbl_options_code_llvm">
                                 <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="receives_default">False</property>
-                                <property name="use_underline">True</property>
-                                <property name="draw_indicator">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">LLVM</property>
+                                <property name="track_visited_links">False</property>
+                                <attributes>
+                                  <attribute name="weight" value="bold"/>
+                                </attributes>
                               </object>
                               <packing>
                                 <property name="left_attach">1</property>
@@ -211,17 +200,88 @@
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkCheckButton" id="chk_options_lines_source">
-                                <property name="label" translatable="yes">Sou_rce</property>
+                              <object class="GtkLabel" id="lbl_options_code_source">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">Source</property>
+                                <attributes>
+                                  <attribute name="weight" value="bold"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="left_attach">2</property>
+                                <property name="top_attach">2</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="lbl_options_code_linenums">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">Line numbers</property>
+                                <property name="use_underline">True</property>
+                                <property name="track_visited_links">False</property>
+                                <property name="xalign">0</property>
+                              </object>
+                              <packing>
+                                <property name="left_attach">0</property>
+                                <property name="top_attach">4</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="lbl_options_syntax">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="label" translatable="yes">Syntax highlighting</property>
+                                <property name="use_underline">True</property>
+                                <property name="track_visited_links">False</property>
+                                <property name="xalign">0</property>
+                              </object>
+                              <packing>
+                                <property name="left_attach">0</property>
+                                <property name="top_attach">3</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSwitch" id="swch_options_syntax_llvm">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
-                                <property name="receives_default">False</property>
-                                <property name="use_underline">True</property>
-                                <property name="draw_indicator">True</property>
+                                <property name="active">True</property>
                               </object>
                               <packing>
                                 <property name="left_attach">1</property>
                                 <property name="top_attach">3</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSwitch" id="swch_options_syntax_source">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="active">True</property>
+                              </object>
+                              <packing>
+                                <property name="left_attach">2</property>
+                                <property name="top_attach">3</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSwitch" id="swch_options_linenums_llvm">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                              </object>
+                              <packing>
+                                <property name="left_attach">1</property>
+                                <property name="top_attach">4</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSwitch" id="swch_options_linenums_source">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="active">True</property>
+                              </object>
+                              <packing>
+                                <property name="left_attach">2</property>
+                                <property name="top_attach">4</property>
                               </packing>
                             </child>
                             <child>
@@ -281,7 +341,7 @@
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkLabel" id="lbl_options_contents">
+                              <object class="GtkLabel" id="lbl_options_show_contents">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <property name="label" translatable="yes">Show co_ntents</property>
@@ -308,7 +368,7 @@
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkLabel" id="lbl_options_source">
+                              <object class="GtkLabel" id="lbl_options_show_source">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <property name="label" translatable="yes">Show _source</property>
@@ -464,21 +524,6 @@
   <object class="GtkRecentManager" id="rmgr_main">
     <property name="filename">/home/tarun/.local/share/recently-used.xbel</property>
   </object>
-  <object class="GtkSourceView" id="srcvw_llvm_unused">
-    <property name="visible">True</property>
-    <property name="can_focus">True</property>
-    <property name="hexpand">True</property>
-    <property name="vexpand">True</property>
-    <property name="editable">False</property>
-    <property name="left_margin">2</property>
-    <property name="right_margin">2</property>
-    <property name="monospace">True</property>
-    <property name="tab_width">4</property>
-    <property name="smart_home_end">before</property>
-    <property name="highlight_current_line">True</property>
-    <property name="indent_on_tab">False</property>
-    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
-  </object>
   <object class="GtkTreeStore" id="trst_contents">
     <columns>
       <!-- column-name Entity -->
@@ -500,9 +545,6 @@
   </object>
   <object class="GtkTreeModelSort" id="trsrt_contents">
     <property name="model">trfltr_contents</property>
-  </object>
-  <object class="GtkTextBuffer" id="txtbuf_llvm">
-    <signal name="notify::cursor-position" handler="on_cursor_moved" swapped="no"/>
   </object>
   <object class="GtkApplicationWindow" id="win_main">
     <property name="can_focus">False</property>
@@ -663,6 +705,7 @@
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">_Tools</property>
                 <property name="use_underline">True</property>
+                <signal name="activate" handler="on_show_source" swapped="no"/>
                 <child type="submenu">
                   <object class="GtkMenu" id="mnu_tools">
                     <property name="visible">True</property>
@@ -785,6 +828,7 @@
                         <property name="tooltip_text" translatable="yes">Show source</property>
                         <property name="label" translatable="yes">Sho_w source</property>
                         <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_show_source" swapped="no"/>
                         <accelerator key="F12" signal="activate"/>
                       </object>
                     </child>
@@ -900,6 +944,7 @@
             <child>
               <object class="GtkToolButton" id="tlbtn_go_back">
                 <property name="visible">True</property>
+                <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
                 <property name="tooltip_text" translatable="yes">Go to previous cursor position</property>
                 <property name="label" translatable="yes">_Back</property>
@@ -915,6 +960,7 @@
             <child>
               <object class="GtkToolButton" id="tlbtn_go_forward">
                 <property name="visible">True</property>
+                <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
                 <property name="tooltip_text" translatable="yes">Go to next cursor position</property>
                 <property name="label" translatable="yes">_Forward</property>
@@ -987,7 +1033,7 @@
                 <property name="visible">True</property>
                 <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Show/hide source</property>
+                <property name="tooltip_text" translatable="yes">Show source</property>
                 <property name="label" translatable="yes">_Source</property>
                 <property name="use_underline">True</property>
                 <property name="icon_name">text-x-script</property>
@@ -1034,6 +1080,7 @@
                 <property name="vexpand">True</property>
                 <property name="position">132</property>
                 <property name="position_set">True</property>
+                <property name="wide_handle">True</property>
                 <child>
                   <object class="GtkGrid" id="grd_contents">
                     <property name="visible">True</property>
@@ -1139,6 +1186,7 @@
                     <property name="can_focus">True</property>
                     <property name="position">264</property>
                     <property name="position_set">True</property>
+                    <property name="wide_handle">True</property>
                     <child>
                       <object class="GtkGrid" id="grd_llvm">
                         <property name="visible">True</property>
@@ -1159,12 +1207,19 @@
                                 <property name="vexpand">True</property>
                                 <property name="shadow_type">in</property>
                                 <child>
-                                  <object class="GtkTextView" id="srcvw_llvm">
+                                  <object class="GtkSourceView" id="srcvw_llvm">
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="vexpand">True</property>
                                     <property name="editable">False</property>
-                                    <property name="buffer">txtbuf_llvm</property>
-                                    <signal name="button-release-event" handler="on_srcvw_llvm_button" swapped="no"/>
+                                    <property name="left_margin">2</property>
+                                    <property name="right_margin">2</property>
+                                    <property name="monospace">True</property>
+                                    <property name="tab_width">4</property>
+                                    <property name="smart_home_end">before</property>
+                                    <property name="highlight_current_line">True</property>
+                                    <property name="indent_on_tab">False</property>
                                   </object>
                                 </child>
                               </object>

@@ -25,6 +25,32 @@ class Options(GObject.GObject):
         nick='style',
         blurb='The style scheme to use in the source views')
 
+    style_llvm = GObject.Property(
+        type=GtkSource.StyleScheme,
+        default=style,
+        nick='style-llvm',
+        blurb=('If syntax_llvm is True, this will be the same as "style" '
+               'else None'))
+
+    style_source = GObject.Property(
+        type=GtkSource.StyleScheme,
+        default=style,
+        nick='style-source',
+        blurb=('If syntax_source is True, this will be the same as "style" '
+               'else None'))
+
+    syntax_llvm = GObject.Property(
+        type=bool,
+        default=True,
+        nick='syntax-llvm',
+        blurb='Use syntax highlighting of the LLVM code')
+
+    syntax_source = GObject.Property(
+        type=bool,
+        default=False,
+        nick='syntax-source',
+        blurb='Use syntax highlighting of the source code')
+
     line_nums_llvm = GObject.Property(
         type=bool,
         default=False,
@@ -98,6 +124,35 @@ class Options(GObject.GObject):
 
         self.kf = GLib.KeyFile.new()
 
+        self.connect('notify::syntax-llvm', self.on_syntax_llvm_changed)
+        self.connect('notify::syntax-source', self.on_syntax_source_changed)
+        self.bind_llvm: GObject.Binding = self.bind_property(
+            'style', self, 'style-llvm',
+            GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+        self.bind_source: GObject.Binding = self.bind_property(
+            'style', self, 'style-source',
+            GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+
+    def on_syntax_llvm_changed(self, *args):
+        if self.bind_llvm:
+            self.bind_llvm.unbind()
+            self.bind_llvm = None
+            self.style_llvm = None
+        if self.syntax_llvm:
+            self.bind_llvm = self.bind_property(
+                'style', self, 'style-llvm',
+                GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+
+    def on_syntax_source_changed(self, *args):
+        if self.bind_source:
+            self.bind_source.unbind()
+            self.bind_source = None
+            self.style_source = None
+        if self.syntax_source:
+            self.bind_source = self.bind_property(
+                'style', self, 'style-source',
+                GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+
     def _get_start_group(self) -> str:
         grp = self.kf.get_start_group()
         if not grp:
@@ -145,8 +200,11 @@ class Options(GObject.GObject):
                        self.get_property(prop.name).to_string())
 
     def _set_style_scheme(self, prop: GObject.Property):
-        self._set_impl(prop, self.kf.set_string,
-                       self.get_property(prop.name).get_id())
+        if self.get_property(prop.name):
+            self._set_impl(prop, self.kf.set_string,
+                           self.get_property(prop.name).get_id())
+        else:
+            self._set_impl(prop, self.kf.set_string, '')
 
     def _set_boolean(self, prop: GObject.Property):
         self._set_impl(prop, self.kf.set_boolean, self.get_property(prop.name))
