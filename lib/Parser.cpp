@@ -599,6 +599,7 @@ Parser::link(Module& module) {
       // definition of a basic block other than to the start of the first
       // instruction
       Offset bb_begin = module.get(llvm_bb.front()).get_llvm_defn().get_begin();
+      bb.set_llvm_defn(Definition::make(bb_begin, bb_begin, bb, module));
 
       // Similarly, the end of the block is a bit problematic because
       // instructions can span multiple lines and relying on any particular

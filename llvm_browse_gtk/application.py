@@ -256,9 +256,12 @@ class Application(Gtk.Application):
         return True
 
     def on_entity_changed(self, *args):
+        self.entity_with_def = lb.get_null_handle()
         if self.entity:
             if lb.is_use(self.entity):
-                self.entity_with_def = lb.use_get_used(self.entity)
+                used = lb.use_get_used(self.entity)
+                if lb.entity_has_llvm_defn(used):
+                    self.entity_with_def = used
             elif lb.is_def(self.entity):
                 self.entity_with_def = lb.get_null_handle()
             elif lb.is_comdat(self.entity):
@@ -266,14 +269,14 @@ class Application(Gtk.Application):
 
     def on_instruction_changed(self, *args):
         if self.inst:
-            if lb.inst_has_source_info(self.inst):
+            if lb.inst_has_source_defn(self.inst):
                 self.entity_with_source = self.inst
             self.func = lb.inst_get_function(self.inst)
 
     def on_function_changed(self, *args):
         if self.func:
             if not self.inst:
-                if lb.func_has_source_info(self.func):
+                if lb.func_has_source_defn(self.func):
                     self.entity_with_source = self.func
 
     def run(self, argv: argparse.Namespace) -> int:

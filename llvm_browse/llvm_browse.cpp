@@ -396,7 +396,7 @@ module_get_code(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_aliases(PyObject* self, PyObject* args) {
-  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
+  const auto& module = get_object<lb::Module>(parse_handle(args));
   PyObject* aliases        = PyList_New(0);
   for(const lb::GlobalAlias& alias : module.aliases())
     PyList_Append(aliases, get_py_handle(alias, HandleKind::GlobalAlias));
@@ -407,7 +407,7 @@ module_get_aliases(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_comdats(PyObject* self, PyObject* args) {
-  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
+  const auto& module = get_object<lb::Module>(parse_handle(args));
   PyObject* comdats        = PyList_New(0);
   for(const lb::Comdat& comdat : module.comdats())
     PyList_Append(comdats, get_py_handle(comdat, HandleKind::Comdat));
@@ -418,7 +418,7 @@ module_get_comdats(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_functions(PyObject* self, PyObject* args) {
-  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
+  const auto& module = get_object<lb::Module>(parse_handle(args));
   PyObject* functions      = PyList_New(0);
   for(const lb::Function& f : module.functions())
     PyList_Append(functions, get_py_handle(f, HandleKind::Function));
@@ -429,7 +429,7 @@ module_get_functions(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_globals(PyObject* self, PyObject* args) {
-  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
+  const auto& module = get_object<lb::Module>(parse_handle(args));
   PyObject* globals        = PyList_New(0);
   for(const lb::GlobalVariable& g : module.globals())
     PyList_Append(globals, get_py_handle(g, HandleKind::GlobalVariable));
@@ -441,7 +441,7 @@ module_get_globals(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_structs(PyObject* self, PyObject* args) {
 
-  const lb::Module& module = get_object<lb::Module>(parse_handle(args));
+  const auto& module = get_object<lb::Module>(parse_handle(args));
   PyObject* structs        = PyList_New(0);
   for(const lb::StructType& s : module.structs())
     PyList_Append(structs, get_py_handle(s, HandleKind::StructType));
@@ -465,7 +465,7 @@ module_get_def_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::Definition* def = module.get_definition_at(offset))
     return get_py_handle(*def, HandleKind::Definition);
   return get_py_handle();
@@ -478,7 +478,7 @@ module_get_use_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::Use* use = module.get_use_at(offset))
     return get_py_handle(*use, HandleKind::Use);
   return get_py_handle();
@@ -491,7 +491,7 @@ module_get_comdat_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::Comdat* comdat = module.get_comdat_at(offset))
     return get_py_handle(*comdat, HandleKind::Comdat);
   return get_py_handle();
@@ -504,7 +504,7 @@ module_get_function_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::Function* f = module.get_function_at(offset))
     return get_py_handle(*f, HandleKind::Function);
   return get_py_handle();
@@ -517,7 +517,7 @@ module_get_block_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::BasicBlock* bb = module.get_block_at(offset))
     return get_py_handle(*bb, HandleKind::BasicBlock);
   return get_py_handle();
@@ -530,7 +530,7 @@ module_get_instruction_at(PyObject* self, PyObject* args) {
   if(!PyArg_ParseTuple(args, "kk", &handle, &offset))
     return nullptr;
 
-  const lb::Module& module = get_object<lb::Module>(handle);
+  const auto& module = get_object<lb::Module>(handle);
   if(const lb::Instruction* inst = module.get_instruction_at(offset))
     return get_py_handle(*inst, HandleKind::Instruction);
   return get_py_handle();
@@ -539,10 +539,17 @@ module_get_instruction_at(PyObject* self, PyObject* args) {
 // Alias interface
 
 static PyObject*
+alias_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::GlobalAlias>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 alias_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::GlobalAlias>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& alias = get_object<lb::GlobalAlias>(parse_handle(args));
+  if(alias.has_llvm_defn())
+    return get_py_handle(alias.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
@@ -592,15 +599,27 @@ alias_is_artificial(PyObject* self, PyObject* args) {
 // Argument interface
 
 static PyObject*
+arg_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(get_object<lb::Argument>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 arg_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::Argument>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& arg = get_object<lb::Argument>(parse_handle(args));
+  if(arg.has_llvm_defn())
+    return get_py_handle(arg.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 arg_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(get_object<lb::Argument>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+arg_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Argument>(parse_handle(args)).has_source_defn());
 }
 
 static PyObject*
@@ -655,16 +674,35 @@ arg_is_artificial(PyObject* self, PyObject* args) {
 // Basic block interface
 
 static PyObject*
+block_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::BasicBlock>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 block_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::BasicBlock>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& bb = get_object<lb::BasicBlock>(parse_handle(args));
+  if(bb.has_llvm_defn())
+    return get_py_handle(bb.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 block_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::BasicBlock>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+block_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::BasicBlock>(parse_handle(args)).has_source_defn());
+}
+
+static PyObject*
+block_get_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::BasicBlock>(parse_handle(args)).get_source_defn());
 }
 
 static PyObject*
@@ -703,7 +741,7 @@ block_is_artificial(PyObject* self, PyObject* args) {
 
 static PyObject*
 block_get_instructions(PyObject* self, PyObject* args) {
-  const lb::BasicBlock& bb = get_object<lb::BasicBlock>(parse_handle(args));
+  const auto& bb = get_object<lb::BasicBlock>(parse_handle(args));
   PyObject* insts          = PyList_New(0);
   for(const lb::Instruction& inst : bb.instructions())
     PyList_Append(insts, get_py_handle(inst, HandleKind::Instruction));
@@ -715,10 +753,16 @@ block_get_instructions(PyObject* self, PyObject* args) {
 // Comdat interface
 
 static PyObject*
+comdat_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(get_object<lb::Comdat>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 comdat_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::Comdat>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& comdat = get_object<lb::Comdat>(parse_handle(args));
+  if(comdat.has_llvm_defn())
+    return get_py_handle(comdat.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
@@ -760,15 +804,27 @@ comdat_is_artificial(PyObject* self, PyObject* args) {
 // Function interface
 
 static PyObject*
+func_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(get_object<lb::Function>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 func_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::Function>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& f = get_object<lb::Function>(parse_handle(args));
+  if(f.has_llvm_defn())
+    return get_py_handle(f.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 func_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(get_object<lb::Function>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+func_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Function>(parse_handle(args)).has_source_defn());
 }
 
 static PyObject*
@@ -832,7 +888,7 @@ func_is_mangled(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_args(PyObject* self, PyObject* args) {
-  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
+  const auto& f = get_object<lb::Function>(parse_handle(args));
   PyObject* arguments   = PyList_New(0);
   for(const lb::Argument& arg : f.arguments())
     PyList_Append(arguments, get_py_handle(arg, HandleKind::Argument));
@@ -843,7 +899,7 @@ func_get_args(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_blocks(PyObject* self, PyObject* args) {
-  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
+  const auto& f = get_object<lb::Function>(parse_handle(args));
   PyObject* blocks      = PyList_New(0);
   for(const lb::BasicBlock& bb : f.blocks())
     PyList_Append(blocks, get_py_handle(bb, HandleKind::BasicBlock));
@@ -854,7 +910,7 @@ func_get_blocks(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_comdat(PyObject* self, PyObject* args) {
-  const lb::Function& f = get_object<lb::Function>(parse_handle(args));
+  const auto& f = get_object<lb::Function>(parse_handle(args));
   if(const lb::Comdat* comdat = f.get_comdat())
     return get_py_handle(*comdat, HandleKind::Comdat);
   return get_py_handle();
@@ -863,16 +919,29 @@ func_get_comdat(PyObject* self, PyObject* args) {
 // Global interface
 
 static PyObject*
+global_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::GlobalVariable>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 global_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::GlobalVariable>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& g = get_object<lb::GlobalVariable>(parse_handle(args));
+  if(g.has_llvm_defn())
+    return get_py_handle(g.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 global_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::GlobalVariable>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+global_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::GlobalVariable>(parse_handle(args)).has_source_defn());
 }
 
 static PyObject*
@@ -941,8 +1010,7 @@ global_is_mangled(PyObject* self, PyObject* args) {
 
 static PyObject*
 global_get_comdat(PyObject* self, PyObject* args) {
-  const lb::GlobalVariable& g
-      = get_object<lb::GlobalVariable>(parse_handle(args));
+  const auto& g = get_object<lb::GlobalVariable>(parse_handle(args));
   if(const lb::Comdat* comdat = g.get_comdat())
     return get_py_handle(*comdat, HandleKind::Comdat);
   return get_py_handle();
@@ -951,16 +1019,29 @@ global_get_comdat(PyObject* self, PyObject* args) {
 // Instruction interface
 
 static PyObject*
+inst_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Instruction>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 inst_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::Instruction>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& inst = get_object<lb::Instruction>(parse_handle(args));
+  if(inst.has_llvm_defn())
+    return get_py_handle(inst.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 inst_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::Instruction>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+inst_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Instruction>(parse_handle(args)).has_source_defn());
 }
 
 static PyObject*
@@ -1021,10 +1102,16 @@ inst_get_function(PyObject* self, PyObject* args) {
 // Metadata interface
 
 static PyObject*
+md_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(get_object<lb::MDNode>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 md_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::MDNode>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& md = get_object<lb::MDNode>(parse_handle(args));
+  if(md.has_llvm_defn())
+    return get_py_handle(md.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
@@ -1065,16 +1152,29 @@ md_is_artificial(PyObject* self, PyObject* args) {
 // Struct interface
 
 static PyObject*
+struct_has_llvm_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::StructType>(parse_handle(args)).has_llvm_defn());
+}
+
+static PyObject*
 struct_get_llvm_defn(PyObject* self, PyObject* args) {
-  return get_py_handle(
-      get_object<lb::StructType>(parse_handle(args)).get_llvm_defn(),
-      HandleKind::Definition);
+  const auto& s = get_object<lb::StructType>(parse_handle(args));
+  if(s.has_llvm_defn())
+    return get_py_handle(s.get_llvm_defn(), HandleKind::Definition);
+  return get_py_handle();
 }
 
 static PyObject*
 struct_get_llvm_span(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::StructType>(parse_handle(args)).get_llvm_span());
+}
+
+static PyObject*
+struct_has_source_defn(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::StructType>(parse_handle(args)).has_source_defn());
 }
 
 static PyObject*
@@ -1126,7 +1226,7 @@ struct_get_full_name(PyObject* self, PyObject* args) {
 static PyObject*
 struct_has_source_info(PyObject* self, PyObject* args) {
   return convert(
-     get_object<lb::StructType>(parse_handle(args)).has_source_info());
+      get_object<lb::StructType>(parse_handle(args)).has_source_info());
 }
 
 static PyObject*
@@ -1149,7 +1249,7 @@ use_get_end(PyObject* self, PyObject* args) {
 
 static PyObject*
 use_get_instruction(PyObject* self, PyObject* args) {
-  const lb::Use& use = get_object<lb::Use>(parse_handle(args));
+  const auto& use = get_object<lb::Use>(parse_handle(args));
   if(const lb::Instruction* inst = use.get_instruction())
     return get_py_handle(*inst, HandleKind::Instruction);
   return get_py_handle();
@@ -1179,6 +1279,38 @@ def_get_defined(PyObject* self, PyObject* args) {
 }
 
 // Generic interface
+
+static PyObject*
+entity_has_llvm_defn(PyObject* self, PyObject* args) {
+  Handle handle = parse_handle(args);
+  switch(get_handle_kind(handle)) {
+  case HandleKind::Argument:
+    return arg_has_llvm_defn(self, args);
+  case HandleKind::BasicBlock:
+    return block_has_llvm_defn(self, args);
+  case HandleKind::Comdat:
+    return comdat_has_llvm_defn(self, args);
+  case HandleKind::Function:
+    return func_has_llvm_defn(self, args);
+  case HandleKind::GlobalAlias:
+    return alias_has_llvm_defn(self, args);
+  case HandleKind::GlobalVariable:
+    return global_has_llvm_defn(self, args);
+  case HandleKind::Instruction:
+    return inst_has_llvm_defn(self, args);
+  case HandleKind::MDNode:
+    return md_has_llvm_defn(self, args);
+  case HandleKind::StructType:
+    return struct_has_llvm_defn(self, args);
+  default:
+    lb::warning() << "Cannot check if entity has LLVM definition: "
+                  << get_handle_kind_name(handle) << "\n";
+    break;
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
 
 static PyObject*
 entity_get_llvm_defn(PyObject* self, PyObject* args) {
@@ -1245,11 +1377,39 @@ entity_get_llvm_span(PyObject* self, PyObject* args) {
 }
 
 static PyObject*
+entity_has_source_defn(PyObject* self, PyObject* args) {
+  Handle handle = parse_handle(args);
+  switch(get_handle_kind(handle)) {
+    case HandleKind::Argument:
+    return arg_has_source_defn(self, args);
+    case HandleKind::BasicBlock:
+    return block_has_source_defn(self, args);
+    case HandleKind::Function:
+    return func_has_source_defn(self, args);
+    case HandleKind::GlobalVariable:
+    return global_has_source_defn(self, args);
+    case HandleKind::Instruction:
+    return global_has_source_defn(self, args);
+    case HandleKind::StructType:
+    return struct_has_source_defn(self, args);
+    default:
+    lb::warning() << "Could not check if entity has source definition: "
+    << get_handle_kind_name(handle) << "\n";
+    break;
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyObject*
 entity_get_source_defn(PyObject* self, PyObject* args) {
   Handle handle = parse_handle(args);
   switch(get_handle_kind(handle)) {
   case HandleKind::Argument:
     return arg_get_source_defn(self, args);
+  case HandleKind::BasicBlock:
+    return block_get_source_defn(self, args);
   case HandleKind::Function:
     return func_get_source_defn(self, args);
   case HandleKind::GlobalVariable:
@@ -1477,7 +1637,7 @@ entity_has_source_info(PyObject* self, PyObject* args) {
     lb::error() << "Cannot check if entity has source info: "
                 << get_handle_kind_name(handle) << "\n";
     return nullptr;
-  }  
+  }
 }
 
 static PyObject*
@@ -1554,6 +1714,7 @@ static PyMethodDef module_methods[] = {
          "Gets the instruction at the offset or HANDLE_NULL"),
 
     // Alias interface
+    FUNC(alias_has_llvm_defn, "Check if the alias has an LLVM definition"),
     FUNC(alias_get_llvm_defn, "LLVM definition range of the alias"),
     FUNC(alias_get_llvm_span, "LLVM span of the alias"),
     FUNC(alias_get_num_uses, "Number of uses of the alias"),
@@ -1565,8 +1726,10 @@ static PyMethodDef module_methods[] = {
     FUNC(alias_is_artificial, "Always returns true"),
 
     // Argument interface
+    FUNC(arg_has_llvm_defn, "Check if the argument has an LLVM definition"),
     FUNC(arg_get_llvm_defn, "LLVM definition range of the argument"),
     FUNC(arg_get_llvm_span, "LLVM span of the argument"),
+    FUNC(arg_has_source_defn, "Check if the argument has a source location"),
     FUNC(arg_get_source_defn, "Source location of the argument"),
     FUNC(arg_get_num_uses, "Number of uses of the argument"),
     FUNC(arg_get_uses, "Uses of the argument"),
@@ -1580,8 +1743,13 @@ static PyMethodDef module_methods[] = {
          "True if the argument was inserted by the compiler"),
 
     // Basic block interface
+    FUNC(block_has_llvm_defn,
+         "Check if the basic block has an LLVM definition"),
     FUNC(block_get_llvm_defn, "LLVM definition range of the basic block"),
     FUNC(block_get_llvm_span, "LLVM span of the basic block"),
+    FUNC(block_has_source_defn,
+         "Check if the basic block has a source location"),
+    FUNC(block_get_source_defn, "Gets the source location of the argument"),
     FUNC(block_get_num_uses, "Number of uses of the block"),
     FUNC(block_get_uses, "Uses of the block"),
     FUNC(block_get_indirect_uses, "Indirect uses of the block"),
@@ -1593,6 +1761,7 @@ static PyMethodDef module_methods[] = {
          "List of handls to the instructions in the basic block"),
 
     // Comdat interface
+    FUNC(comdat_has_llvm_defn, "Check if the comdat has an LLVM definition"),
     FUNC(comdat_get_llvm_defn, "LLVM definition range of the comdat"),
     FUNC(comdat_get_self_llvm_defn, "LLVM definition of the comdat itself"),
     FUNC(comdat_get_llvm_span, "LLVM span of the comdat"),
@@ -1603,8 +1772,10 @@ static PyMethodDef module_methods[] = {
     FUNC(comdat_is_artificial, "Always returns true"),
 
     // Function interface
+    FUNC(func_has_llvm_defn, "Check if the function has an LLVM definition"),
     FUNC(func_get_llvm_defn, "LLVM definition range of the function"),
     FUNC(func_get_llvm_span, "LLVM span of the function"),
+    FUNC(func_has_source_defn, "Check if the function has a source location"),
     FUNC(func_get_source_defn, "Source location of the function"),
     FUNC(func_get_num_uses, "Number of uses of the function"),
     FUNC(func_get_uses, "Uses of the function"),
@@ -1626,8 +1797,11 @@ static PyMethodDef module_methods[] = {
          "does not have a comdat"),
 
     // Global interface
+    FUNC(global_has_llvm_defn, "Check if the global has an LLVM definition"),
     FUNC(global_get_llvm_defn, "LLVM definition range of the global"),
     FUNC(global_get_llvm_span, "LLVM span of the global"),
+    FUNC(global_has_source_defn,
+         "Check if the global variable has a source location"),
     FUNC(global_get_source_defn, "Source location of the global"),
     FUNC(global_get_num_uses, "Number of uses of the global"),
     FUNC(global_get_uses, "Uses of the global"),
@@ -1645,8 +1819,11 @@ static PyMethodDef module_methods[] = {
          "global does not have a comdat"),
 
     // Instruction interface
+    FUNC(inst_has_llvm_defn, "Check if the instruction has an LLVM definition"),
     FUNC(inst_get_llvm_defn, "LLVM definition range of the instruction"),
     FUNC(inst_get_llvm_span, "LLVM span of the instruction"),
+    FUNC(inst_has_source_defn,
+         "Check if the instruction has a source location"),
     FUNC(inst_get_source_defn, "Source location of the instruction"),
     FUNC(inst_get_num_uses, "Number of uses of the instruction"),
     FUNC(inst_get_uses, "Uses of the instruction"),
@@ -1659,6 +1836,7 @@ static PyMethodDef module_methods[] = {
     FUNC(inst_get_block, "The basic block to which this instruction belongs"),
 
     // Metadata interface
+    FUNC(md_has_llvm_defn, "Check if the metadata node has an LLVM definition"),
     FUNC(md_get_llvm_defn, "LLVM definition range of the metadata node"),
     FUNC(md_get_llvm_span, "LLVM span of the metadata node"),
     FUNC(md_get_num_uses, "Number of uses of the metadata node"),
@@ -1669,8 +1847,10 @@ static PyMethodDef module_methods[] = {
     FUNC(md_is_artificial, "Always returns true"),
 
     // Struct interface
+    FUNC(struct_has_llvm_defn, "Check if the struct has an LLVM definition"),
     FUNC(struct_get_llvm_defn, "LLVM definition range of the struct"),
     FUNC(struct_get_llvm_span, "LLVM span of the struct"),
+    FUNC(struct_has_source_defn, "Check if the struct has a source location"),
     FUNC(struct_get_source_defn, "Source location of the struct"),
     FUNC(struct_get_num_uses, "Number of uses of the struct"),
     FUNC(struct_get_uses, "Uses of the struct"),
@@ -1696,8 +1876,10 @@ static PyMethodDef module_methods[] = {
     FUNC(def_get_defined, "The entity defined by the definition"),
 
     // Generic interface
+    FUNC(entity_has_llvm_defn, "True if the entity has an LLVM definition set"),
     FUNC(entity_get_llvm_defn, "LLVM definition range of the entity"),
     FUNC(entity_get_llvm_span, "LLVM span of the entity"),
+    FUNC(entity_has_source_defn, "Check if the entity has a source location"),
     FUNC(entity_get_source_defn, "Source location of the entity"),
     FUNC(entity_get_num_uses, "Number of uses of the entity"),
     FUNC(entity_get_uses, "Uses of the entity"),
