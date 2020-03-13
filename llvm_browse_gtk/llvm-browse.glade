@@ -627,6 +627,7 @@
                             <property name="filter">rfltr_main</property>
                             <property name="limit">10</property>
                             <property name="recent_manager">rmgr_main</property>
+                            <property name="show_icons">False</property>
                             <property name="sort_type">mru</property>
                             <signal name="item-activated" handler="on_open_recent" swapped="no"/>
                           </object>
