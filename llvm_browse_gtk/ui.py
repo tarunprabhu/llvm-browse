@@ -150,6 +150,8 @@ class UI(GObject.GObject):
         bind('line-nums-source', self['srcvw_source'], 'show-line-numbers')
         bind('line-nums-source',
              self['swch_options_linenums_source'], 'active')
+        bind('wrap-llvm', self['swch_options_wrap_llvm'], 'active')
+        bind('wrap-source', self['swch_options_wrap_source'], 'active')
         bind('window-maximized', self['swch_options_maximized'], 'active')
 
         # show-contents and show-source only apply when the application is
@@ -162,6 +164,9 @@ class UI(GObject.GObject):
         bind('show-source', self['swch_options_source'], 'active')
 
         self.options.connect('notify::font', self.on_font_changed)
+        self.options.connect('notify::wrap-llvm', self.on_wrap_llvm_changed)
+        self.options.connect('notify::wrap-source',
+                             self.on_wrap_source_changed)
 
     def _bind_widget_properties(self):
         self._bind(self['mitm_view_contents_pane'], 'active',
@@ -250,6 +255,33 @@ class UI(GObject.GObject):
         name = model[i][ModelColsContents.Display]
         return srch in name
 
+    # Utilities
+
+    def format_tooltip(self, entity: int) -> str:
+        source_name = lb.entity_get_source_name(entity)
+
+        out = []
+        if source_name:
+            out.append('<span font_desc="{}">'.format(
+                self.options.font.to_string()))
+            out.append('<b>{:7}</b> {}'.format(
+                'Source',
+                GLib.markup_escape_text(source_name)))
+            qualified_name = lb.entity_get_qualified_name(entity)
+            if qualified_name:
+                out.append('\n<b>{:7}</b> {}'.format(
+                    'Qual',
+                    GLib.markup_escape_text(qualified_name)))
+            full_name = lb.entity_get_full_name(entity)
+            if full_name:
+                out.append('\n<b>{:7}</b> {}'.format(
+                    'Full',
+                    GLib.markup_escape_text(full_name)))
+            out.append('</span>')
+
+        return ''.join(out)
+
+
     @GObject.Signal
     def launch(self, *args):
         self['win_main'].show()
@@ -257,6 +289,7 @@ class UI(GObject.GObject):
             self['win_main'].maximize()
 
     # Implementation functions
+
     # The callbacks functions could be invoked by different means, either a
     # menu click, a keyboard shortcut or may be even implicitly as a result
     # of some other action. The do_* methods implement the actual funtionality
@@ -313,30 +346,6 @@ class UI(GObject.GObject):
                 return Pango.Style.ITALIC
             return Pango.Style.NORMAL
 
-        def get_tooltip(entity: int) -> str:
-            source_name = lb.entity_get_source_name(entity)
-            full_name = lb.entity_get_full_name(entity)
-
-            out = []
-            if source_name:
-                out.append('<span font_desc="{}">'.format(
-                    self.options.font.to_string()))
-                if source_name:
-                    out.append('<b>{:7}</b> {}'.format(
-                        'Source',
-                        GLib.markup_escape_text(source_name)))
-                if full_name:
-                    # We will never have the situation where an entity has a
-                    # full name but no source name because the full name will
-                    # have been computed from the source name. So it's safe to
-                    # prepend the string with a newline
-                    out.append('\n<b>{:7}</b> {}'.format(
-                        'Full',
-                        GLib.markup_escape_text(full_name)))
-                out.append('</span>')
-
-            return ''.join(out)
-
         def add_category(label: str) -> Gtk.TreeIter:
             return self.trst_contents.append(
                 None, [lb.get_null_handle(),
@@ -350,7 +359,7 @@ class UI(GObject.GObject):
             self.trst_contents.append(
                 i, [entity,
                     lb.entity_get_llvm_name(entity),
-                    get_tooltip(entity),
+                    self.format_tooltip(entity),
                     get_style(entity),
                     Pango.Weight.NORMAL,
                     font])
@@ -673,6 +682,18 @@ class UI(GObject.GObject):
             style.add_provider(
                 provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def on_wrap_llvm_changed(self, *args):
+        wrap = Gtk.WrapMode.WORD \
+            if self.options.wrap_llvm \
+            else Gtk.WrapMode.NONE
+        self.srcvw_llvm.set_wrap_mode(wrap)
+
+    def on_wrap_source_changed(self, *args):
+        wrap = Gtk.WrapMode.WORD \
+            if self.options.wrap_source \
+            else Gtk.WrapMode.NONE
+        self.srcvw_code.set_wrap_mode(wrap)
 
     def get_application_window(self) -> Gtk.ApplicationWindow:
         return self.win_main

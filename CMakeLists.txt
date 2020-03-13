@@ -157,16 +157,44 @@ function(check_python_bindings BINDING_NAME BINDING_VERSION)
       set(Py${BINDING_NAME}_FOUND YES CACHE BOOL "Found Python binding for ${BINDING_NAME} ${BINDING_VERSION}")
     endif()
   endif()
-endfunction(check_python_bindings)
+endfunction()
+
+# Checks if a Python module is available
+# By default, the modules are not required. If a module is required, an 
+# additional REQUIRED argument must be passed to the function
+function(check_python_module MODULE_NAME)
+  if(${ARGC} GREATER 1)
+    if(ARGV1 STREQUAL "REQUIRED")
+      set(REQUIRED "REQUIRED")
+    else()
+      message(FATAL_ERROR "INTERNAL ERROR: Value of optional "
+        "argument for function check_python_module() must be REQUIRED. "
+        "Got ${ARGV1}")
+    endif()
+  endif()
+
+  if(NOT Py${MODULE_NAME}_FOUND)
+    message(STATUS "Checking for Python module '${MODULE_NAME}'")
+    execute_process(COMMAND
+      ${Python_EXECUTABLE} -c "import ${MODULE_NAME}"
+      OUTPUT_QUIET
+      ERROR_QUIET
+      RESULT_VARIABLE RETCODE)
+    if(NOT RETCODE EQUAL 0)
+      if(REQUIRED)
+        message(FATAL_ERROR "Missing requied Python module: ${MODULE_NAME}")
+      else()
+        message(STATUS "  MISSING optional Python module ${MODULE_NAME}")
+      endif()
+    else()
+      message(STATUS "  Found Python module ${MODULE_NAME}")
+      set(Py${MODULE_NAME}_FOUND YES CACHE BOOL "Found Python module ${MODULE_NAME}")
+    endif()
+  endif()
+endfunction()
 
 # Check if gi python module is installed
-execute_process(COMMAND
-    ${Python_EXECUTABLE} -c "import gi"
-    OUTPUT_QUIET
-    ERROR_VARIABLE PY_GI_ERROR)
-if(PY_GI_ERROR)
-  message(FATAL_ERROR "Missing required python module: gi")
-endif()
+check_python_module(gi REQUIRED)
 
 # GObject
 set(PY_GOBJECT_VERSION 2.0)
@@ -227,6 +255,9 @@ set(PY_PANGOCAIRO_VERSION 1.0)
 set(PANGO_PACKAGE pangocairo)
 pkg_check_modules(PANGO_CAIRO REQUIRED ${PANGO_PACKAGE}>=${PANGO_PACKAGE_MINIMUM})
 check_python_bindings(PangoCairo ${PY_PANGOCAIRO_VERSION})
+
+# Check for other Python modules
+check_python_module(termcolor)
 
 # glib_compile_resources
 pkg_get_variable(GLIB_COMPILE_RESOURCES ${GIO_PACKAGE} glib_compile_resources)

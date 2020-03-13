@@ -2,6 +2,7 @@ set(SOURCES
 	__init__.py
 	__main__.py
 	application.py
+	logger.py
 	options.py
 	ui.py)
 

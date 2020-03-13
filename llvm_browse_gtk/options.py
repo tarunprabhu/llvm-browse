@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from .logger import critical, error, message, warning
 from os import makedirs, path
 from sys import stderr
 from typing import List
@@ -62,6 +63,18 @@ class Options(GObject.GObject):
         default=True,
         nick='line-nums-source',
         blurb='Show line numbers in the source view')
+
+    wrap_llvm = GObject.Property(
+        type=bool,
+        default=False,
+        nick='wrap-llvm',
+        blurb='True if lines should be wrapped in the LLVM view')
+
+    wrap_source = GObject.Property(
+        type=bool,
+        default=False,
+        nick='wrap-source',
+        blurb='True if lines should be wrapped in the source view')
 
     show_contents = GObject.Property(
         type=bool,
@@ -220,6 +233,7 @@ class Options(GObject.GObject):
 
     def load(self):
         try:
+            message('Reading options from', self.file_path)
             self.kf.load_from_file(
                 self.file_path, GLib.KeyFileFlags.KEEP_COMMENTS)
             for prop in Options.get_properties():
@@ -228,17 +242,19 @@ class Options(GObject.GObject):
                         prop.name,
                         self.read_funcs[prop.type.name](prop))
                 except GLib.Error as e:
-                    print('Error reading option: ', prop.name,
-                          '\n  ', e.message, file=stderr)
+                    warning(e.message)
+                    self.set_property(prop.name,
+                                      getattr(Options, prop.name).default)
         except GLib.Error as ferr:
-            print('Could not open config file.', ferr.message, file=stderr)
+            critical('Could not open config file.', ferr.message, file=stderr)
 
     def store(self):
         for prop in Options.get_properties():
             self.write_funcs[prop.type.name](prop)
         try:
+            message('Writing options to', self.file_path)
             if not path.exists(self.file_path):
                 makedirs(path.dirname(self.file_path))
             self.kf.save_to_file(self.file_path)
         except GLib.Error as ferr:
-            print('Could not write config file.', ferr.message, file=stderr)
+            critical('Could not write config file.', ferr.message, file=stderr)
