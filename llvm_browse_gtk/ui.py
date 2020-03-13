@@ -305,6 +305,7 @@ class UI(GObject.GObject):
     def do_clear(self):
         self.srcbuf_llvm.set_text('')
         self.srcbuf_code.set_text('')
+        self['lbl_llvm_filename'].set_text('')
         self['lbl_source_filename'].set_text('')
         self.trst_contents.clear()
 
@@ -380,6 +381,7 @@ class UI(GObject.GObject):
         self.trvw_contents.set_model(self.trsrt_contents)
 
     def do_open(self):
+        self['lbl_llvm_filename'].set_text(self.app.llvm)
         self.srcbuf_llvm.set_text(lb.module_get_code(self.app.module))
 
         self.do_populate_contents()

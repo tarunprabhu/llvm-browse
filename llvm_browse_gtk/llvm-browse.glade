@@ -1340,6 +1340,23 @@
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
+                            <property name="top_attach">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="lbl_llvm_filename">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="margin_left">6</property>
+                            <property name="margin_right">6</property>
+                            <property name="margin_top">6</property>
+                            <property name="margin_bottom">6</property>
+                            <property name="ellipsize">middle</property>
+                            <property name="single_line_mode">True</property>
+                            <property name="track_visited_links">False</property>
+                          </object>
+                          <packing>
+                            <property name="left_attach">0</property>
                             <property name="top_attach">0</property>
                           </packing>
                         </child>
@@ -1391,10 +1408,10 @@
                           <object class="GtkLabel" id="lbl_source_filename">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="margin_left">8</property>
-                            <property name="margin_right">8</property>
-                            <property name="margin_top">8</property>
-                            <property name="margin_bottom">8</property>
+                            <property name="margin_left">6</property>
+                            <property name="margin_right">6</property>
+                            <property name="margin_top">6</property>
+                            <property name="margin_bottom">6</property>
                             <property name="ellipsize">middle</property>
                             <property name="single_line_mode">True</property>
                             <property name="track_visited_links">False</property>
