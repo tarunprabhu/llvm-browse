@@ -1086,6 +1086,18 @@ inst_is_artificial(PyObject* self, PyObject* args) {
 }
 
 static PyObject*
+inst_is_llvm_debug_inst(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Instruction>(parse_handle(args)).is_llvm_debug_inst());
+}
+
+static PyObject*
+inst_is_llvm_lifetime_inst(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Instruction>(parse_handle(args)).is_llvm_lifetime_inst());
+}
+
+static PyObject*
 inst_get_block(PyObject* self, PyObject* args) {
   return get_py_handle(
       get_object<lb::Instruction>(parse_handle(args)).get_block(),
@@ -1832,6 +1844,11 @@ static PyMethodDef module_methods[] = {
     FUNC(inst_has_source_info,
          "True if the instruction has source information attached"),
     FUNC(inst_is_artificial, "True if the parent function is artificial"),
+    FUNC(inst_is_llvm_debug_inst,
+         "True if the instruction is a call to an LLVM debug intrinsic"),
+    FUNC(inst_is_llvm_lifetime_inst,
+         "True if the instruction is a call to an LLVM memory lifetime "
+         "intrinsic"),
     FUNC(inst_get_function, "The function to which this instruction belongs"),
     FUNC(inst_get_block, "The basic block to which this instruction belongs"),
 

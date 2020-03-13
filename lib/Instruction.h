@@ -52,6 +52,8 @@ public:
   llvm::iterator_range<Iterator> operands() const;
   const BasicBlock& get_block() const;
   const Function& get_function() const;
+  bool is_llvm_lifetime_inst() const;
+  bool is_llvm_debug_inst() const;
 
 public:
   static bool classof(const Value* v) {

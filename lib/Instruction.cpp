@@ -51,7 +51,7 @@ Instruction::Instruction(const llvm::Instruction& llvm_i,
             // of some register variable could get mapped to a local variable
             // in the source. Short of creating a separate local variable
             // object, there is not much we can do with it.
-          }
+          } 
         }
       }
     }
@@ -91,6 +91,24 @@ Instruction::end() const {
 llvm::iterator_range<Instruction::Iterator>
 Instruction::operands() const {
   return llvm::iterator_range<Instruction::Iterator>(ops);
+}
+
+bool
+Instruction::is_llvm_debug_inst() const {
+  if(const auto* call = dyn_cast<llvm::CallInst>(&get_llvm()))
+    if(const llvm::Function* f = call->getCalledFunction())
+      if(f->getName().startswith("llvm.dbg."))
+        return true;
+  return false;
+}
+
+bool
+Instruction::is_llvm_lifetime_inst() const {
+  if(const auto* call = dyn_cast<llvm::CallInst>(&get_llvm()))
+    if(const llvm::Function* f = call->getCalledFunction())
+      if(f->getName().startswith("llvm.lifetime."))
+        return true;
+  return false;
 }
 
 BasicBlock&
