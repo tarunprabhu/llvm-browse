@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-from enum import IntEnum
+from enum import auto, Enum, IntEnum
+from typing import Tuple, List, Mapping
 import llvm_browse as lb
 import operator
 import os
+import re
 import gi
 gi.require_version('GObject', '${PY_GOBJECT_VERSION}')
 gi.require_version('GLib', '${PY_GLIB_VERSION}')
@@ -25,6 +27,20 @@ class ModelColsContents(IntEnum):
     Style = 3
     Weight = 4
     Font = 5
+
+
+class SearchDirection(Enum):
+    Forward = auto()
+    Backward = auto()
+
+
+class SearchState:
+    def __init__(self, direction: SearchDirection, i: Gtk.TextIter):
+        self.direction = direction
+        self.iter_start = i
+        self.iter_curr = i
+        self.flags = Gtk.TextSearchFlags.TEXT_ONLY \
+            | Gtk.TextSearchFlags.CASE_INSENSITIVE
 
 
 class UI(GObject.GObject):
@@ -75,6 +91,7 @@ class UI(GObject.GObject):
         self.lang_mgr = GtkSource.LanguageManager.get_default()
         self.app = app
         self.options: Options = self.app.options
+        self.search = None
 
         self.srcbuf_llvm.connect(
             'notify::cursor-position', self.on_cursor_moved)
@@ -163,14 +180,19 @@ class UI(GObject.GObject):
             return self._bind(self.app, src_prop, dst,
                               dst_prop, bidirectional, invert)
 
+        # FIXME: At some point, implement goto line: # self['mitm_goto_line'],
         for widget in (self['mitm_reload'],
                        self['tlbtn_reload'],
                        self['mitm_close'],
                        self['tlbtn_close'],
                        self['mitm_search_forward'],
                        self['mitm_search_backward'],
-                       self['mitm_goto_line']):
+                       self['mitm_search_contents']):
             bind('module', widget, 'sensitive')
+
+        for widget in (self['mitm_push_mark'],
+                       self['tlbtn_push_mark']):
+            bind('entity', widget, 'sensitive')
 
         for widget in (self['tlbtn_source'],
                        self['mitm_view_source']):
@@ -180,15 +202,21 @@ class UI(GObject.GObject):
                        self['mitm_goto_definition']):
             bind('entity-with-def', widget, 'sensitive')
 
+        # for widget in (self['mitm_goto_prev_mark'],
+        #                self['tlbtn_goto_prev_mark'],
+        #                self['mitm_goto_next_mark'],
+        #                self['tlbtn_goto_next_mark']):
+        #     bind('mark', widget, 'sensitive')
+
+        for widget in (self['mitm_pop_mark'],
+                       self['tlbtn_pop_mark']):
+            bind('mark', widget, 'sensitive')
+
         for widget in (self['mitm_goto_prev_use'],
                        self['tlbtn_goto_prev_use'],
                        self['mitm_goto_next_use'],
                        self['tlbtn_goto_next_use']):
             bind('mark-uses-count', widget, 'sensitive')
-    # self['mitm_go_back'],
-    # self['tlbtn_go_back'],
-    # self['mitm_go_forward'],
-    # self['tlbtn_go_forward']):
 
     def fn_contents_sort_names(self,
                                model: Gtk.TreeModel,
@@ -241,23 +269,37 @@ class UI(GObject.GObject):
 
         GLib.idle_add(impl, *args, priority=GLib.PRIORITY_DEFAULT_IDLE)
 
-    def do_scroll_llvm_to_offset(self, offset: int):
+    def do_clear(self):
+        self.srcbuf_llvm.set_text('')
+        self.srcbuf_code.set_text('')
+        self['lbl_source_filename'].set_text('')
+        self.trst_contents.clear()
+
+    def do_scroll_llvm_to_offset(self, offset: int, length=0):
         def update_ui(i: Gtk.TreeIter) -> bool:
             self.srcvw_llvm.scroll_to_iter(i, 0.1, True, 0, 0)
             return False
 
         off_iter = self.srcbuf_llvm.get_iter_at_offset(offset)
         line = off_iter.get_line()
-        column = off_iter.get_line_offset() + 1
-        line_iter = self.srcbuf_llvm.get_iter_at_line(line) 
+        column = off_iter.get_line_offset()
+        line_iter = self.srcbuf_llvm.get_iter_at_line(line)
         col_iter = self.srcbuf_llvm.get_iter_at_line_offset(line, column)
         self.srcbuf_llvm.place_cursor(col_iter)
+        if length:
+            end_iter = self.srcbuf_llvm.get_iter_at_line_offset(
+                line, column + length)
+            self.srcbuf_llvm.select_range(col_iter, end_iter)
         self.do_async(update_ui, line_iter)
 
     def do_entity_select(self, entity: int):
         defn = lb.entity_get_llvm_defn(entity)
         offset = lb.def_get_begin(defn)
-        self.do_scroll_llvm_to_offset(offset)
+        tag = lb.entity_get_tag(entity)
+        # Move the offset forward once because the offset will always be the
+        # start of the tag which will be a sentinel character and we don't
+        # want to match that
+        self.do_scroll_llvm_to_offset(offset + 1, len(tag) - 1)
 
     def do_toggle_expand_row(self, path: Gtk.TreePath):
         if self.trvw_contents.row_expanded(path):
@@ -339,7 +381,8 @@ class UI(GObject.GObject):
             if ext in ['c', 'c99', 'c11']:
                 return self.lang_mgr.get_language('c')
             elif ext in ['cc', 'cpp', 'cxx', 'C', 'CC', 'CPP', 'CXX',
-                         'c++', 'h', 'hh', 'hpp', 'hxx']:
+                         'c++', 'h', 'hh', 'hpp', 'hxx',
+                         'tcc', 'txx']:
                 return self.lang_mgr.get_language('cpp')
             elif ext in ['f', 'F', 'fpp', 'f90', 'F90', 'F95', 'f95',
                          'fort', 'F03', 'f03', 'f08', 'f08']:
@@ -353,6 +396,18 @@ class UI(GObject.GObject):
             else:
                 return None
 
+        # This is an attempt to highlight something "useful" in the source
+        # It is not always easy to do because a single "source expression"
+        # could map to multiple LLVM instructions. Ideally, we should find some
+        # way to draw a some kind of visual indicator at the appropriate column
+        # Until then, just find a "token" and highlight it
+        def get_source_expr_length(line: str) -> int:
+            r = re.compile('^(\\s*[A-Za-z0-9_]+).*$')
+            m = r.match(line)
+            if m:
+                return len(m.group(1))
+            return 1
+
         def update_ui(i: Gtk.TreeIter) -> bool:
             self.srcvw_code.scroll_to_iter(i, 0.1, True, 0, 0)
             return False
@@ -360,14 +415,51 @@ class UI(GObject.GObject):
         src_info = lb.entity_get_source_defn(entity)
         file = src_info.file
         line = src_info.begin.line - 1
-        column = src_info.begin.column
+        column = src_info.begin.column - 1
         self.srcbuf_code.set_language(get_source_lang(file))
-        with open(file, 'r') as f:
-            self.srcbuf_code.set_text(f.read())
+
+        # If the file is already being shown, don't reload it
+        if self['lbl_source_filename'].get_text() != file:
+            self['lbl_source_filename'].set_text(file)
+            with open(file, 'r') as f:
+                self.srcbuf_code.set_text(f.read())
+
         line_iter = self.srcbuf_code.get_iter_at_line(line)
         col_iter = self.srcbuf_code.get_iter_at_line_offset(line, column)
         self.srcbuf_code.place_cursor(col_iter)
+
+        text = self.srcbuf_code.get_text(
+            col_iter, self.srcbuf_code.get_iter_at_line(line+1), False)
+        end_iter = self.srcbuf_code.get_iter_at_line_offset(
+            line, column + get_source_expr_length(text))
+        self.srcbuf_code.select_range(col_iter, end_iter)
         self.do_async(update_ui, line_iter)
+
+    def do_search_start(self, direction: SearchDirection):
+        cursor = self.srcbuf_llvm.get_property('cursor-position')
+        size = len(self.srcbuf_llvm.get_property('text'))
+        if cursor < 0 or cursor >= size:
+            cursor = 0
+        self.search = SearchState(
+            direction,
+            self.srcbuf_llvm.get_iter_at_offset(cursor))
+        self['srchbar_llvm'].set_search_mode(True)
+        self['srch_llvm'].grab_focus()
+
+    def do_search(self, srch: str) -> Tuple[Gtk.TextIter, Gtk.TextIter]:
+        if self.search.direction == SearchDirection.Forward:
+            match = self.search.iter_curr.forward_search(
+                srch, self.search.flags, None)
+            if match:
+                self.search.iter_curr = match[1]
+        else:
+            match = self.search.iter_curr.backward_search(
+                srch, self.search.flags, None)
+            if match:
+                self.search.iter_curr = match[0]
+        if match:
+            return match
+        return None, None
 
     # Callback functions
 
@@ -380,23 +472,22 @@ class UI(GObject.GObject):
     def on_open(self, widget: Gtk.Widget) -> bool:
         dlg = self['dlg_file']
         response = dlg.run()
+        dlg.hide()
         if response == Gtk.ResponseType.OK:
             # FIXME: Do this in a separate thread instead of blocking the
             # UI by doing this here
             self.app.action_open(dlg.get_filename())
-        dlg.hide()
         return False
 
     def on_close(self, *args) -> bool:
         self.app.action_close()
-        self.srcbuf_llvm.set_text('')
+        self.do_clear()
         return False
 
     def on_reload(self, *args) -> bool:
         # FIXME: Do this in a separate thread instead of blocking the UI
         # by doing this
-        if self.app.action_reload():
-            self.do_open()
+        self.app.action_reload()
         return False
 
     def on_quit(self, *args) -> bool:
@@ -503,15 +594,28 @@ class UI(GObject.GObject):
         return False
 
     def on_goto_prev_use(self, *args) -> bool:
+        self.app.action_goto_prev_use()
         return False
 
     def on_goto_next_use(self, *args) -> bool:
+        self.app.action_goto_next_use()
         return False
 
-    def on_go_back(self, *args) -> bool:
+    def on_goto_prev_mark(self, *args) -> bool:
         return False
 
-    def on_go_forward(self, *args) -> bool:
+    def on_goto_next_mark(self, *args) -> bool:
+        return False
+
+    def on_mark_push(self, *args) -> bool:
+        offset = self.srcbuf_llvm.get_property('cursor-position')
+        self.app.action_mark_push(self.app.entity, offset)
+
+        return False
+
+    def on_mark_pop(self, *args) -> bool:
+        self.app.action_mark_pop()
+
         return False
 
     def on_show_source(self, *args) -> bool:
@@ -519,10 +623,34 @@ class UI(GObject.GObject):
         return False
 
     def on_search_forward(self, *args) -> bool:
+        self.do_search_start(SearchDirection.Forward)
+
         return False
 
     def on_search_backward(self, *args) -> bool:
+        self.do_search_start(SearchDirection.Backward)
+
         return False
+
+    def on_search_go(self, *args) -> bool:
+        srch = self['srch_llvm'].get_text()
+        if srch:
+            m_begin, m_end = self.do_search(srch)
+            if m_begin and m_end:
+                self.do_scroll_llvm_to_offset(m_begin.get_offset(), len(srch))
+        return False
+
+    def on_search_stop(self, *args) -> bool:
+        self.search = None
+        self.srcvw_llvm.grab_focus()
+
+        return False
+
+    def on_srcvw_llvm_populate_popup(self, *args) -> bool:
+        # Don't show the default popup. At some point, we may want to add
+        # our own entries here
+        print(*args)
+        return True
 
     def on_toggle_fullscreen(self, *args) -> bool:
         if self['mitm_toggle_fullscreen'].get_active():

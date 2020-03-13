@@ -16,10 +16,13 @@ from gi.repository import GLib, GObject, Gtk, GtkSource  # NOQA: E402
 # here so we can be sure that it gets registered before anything else
 GObject.type_register(GtkSource.View)
 
+# Typedefs
+GHandle = GObject.TYPE_UINT64
+
 
 class Application(Gtk.Application):
     module = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='module',
         blurb='Handle to the LLVM module')
@@ -31,29 +34,34 @@ class Application(Gtk.Application):
         blurb='The path to the LLVM file currently shown or ""')
 
     entity = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='entity',
         blurb=('The current entity. '
                'This will be a use, def or comdat'))
 
     inst = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='inst',
         blurb=('The current instruction'))
 
     func = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='func',
         blurb=('The current function. '
                'This may be set even if self.inst is not'))
 
-    # entity_with_source will be the same as the instruction
-    # if self.inst is set else it will be self.func
+    # The entity with source is used to enable the "view source" action
+    # Both the current instruction and the current function could have source
+    # information associated with it. In that case, we give the instruction 
+    # source priority if it is set. There may be some instructions in the 
+    # function that don't have source infromation associated with it
+    # These could be LLVM intrinsic instructions for instance. In such case, 
+    # the function should be used as the source entity
     entity_with_source = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='entity-with-source',
         blurb=('Handle of the entity whose source will be shown '
@@ -62,18 +70,24 @@ class Application(Gtk.Application):
     # entity_with_def will be the same as self.entity
     # if self.entity is a use or a comdat. Else it will be None
     entity_with_def = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='entity-with-def',
         blurb=('Handle of the entity with a definition. '
                'Used when the goto definition action is launched'))
 
     mark = GObject.Property(
-        type=GObject.TYPE_UINT64,
+        type=GHandle,
         default=lb.get_null_handle(),
         nick='curr-mark',
         blurb=('Handle of the marked entity. '
                'This is the handle at the top of the self.marks stack'))
+
+    mark_offset = GObject.Property(
+        type=GObject.TYPE_UINT64,
+        default=0,
+        nick='mark-offset',
+        blurb='Offset of the mark in the LLVM IR')
 
     mark_uses_count = GObject.Property(
         type=int,
@@ -100,7 +114,7 @@ class Application(Gtk.Application):
 
         # The user has to explicitly set a mark. When one is set, prev-use
         # and next-use will be enabled and the user can navigate this list
-        self.marks: List[int] = []
+        self.marks: List[Tuple[int, int]] = []
 
         # A map from entities to uses. The keys are all guaranteed to be in
         # self.marks
@@ -164,7 +178,8 @@ class Application(Gtk.Application):
         if self.entity_with_def:
             defn = lb.entity_get_llvm_defn(self.entity_with_def)
             offset = lb.def_get_begin(defn)
-            self.ui.do_scroll_llvm_to_offset(offset)
+            tag = lb.entity_get_tag(self.entity_with_def)
+            self.ui.do_scroll_llvm_to_offset(offset, len(tag))
             return True
         return False
 
@@ -178,7 +193,9 @@ class Application(Gtk.Application):
                         self.mark_uses_index = self.mark_uses_count
                     self.mark_uses_index -= 1
                 use = self.uses_map[self.mark][self.mark_uses_index]
-                self.ui.do_scroll_llvm_to_offset(lb.use_get_begin(use))
+                tag = lb.entity_get_tag(lb.use_get_used(use))
+                self.ui.do_scroll_llvm_to_offset(
+                    lb.use_get_begin(use), len(tag))
                 return True
             return False
         return False
@@ -193,14 +210,16 @@ class Application(Gtk.Application):
                         self.mark_uses_index = -1
                     self.mark_uses_index += 1
                 use = self.uses_map[self.mark][self.mark_uses_index]
-                self.ui.do_scroll_llvm_to_offset(lb.use_get_begin(use))
+                tag = lb.entity_get_tag(lb.use_get_used(use))
+                self.ui.do_scroll_llvm_to_offset(
+                    lb.use_get_begin(use), len(tag))
             return False
         return False
 
-    def action_go_back(self) -> bool:
+    def action_goto_prev_mark(self) -> bool:
         pass
 
-    def action_go_forward(self) -> bool:
+    def action_goto_next_mark(self) -> bool:
         pass
 
     def action_show_source(self) -> bool:
@@ -209,33 +228,42 @@ class Application(Gtk.Application):
             return True
         return False
 
-    def set_mark(self):
-        entity = self.marks[-1] if self.marks else lb.get_null_handle()
+    def set_mark(self, entity: int, offset: int = 0):
         if lb.is_null_handle(entity):
             self.mark = lb.get_null_handle()
+            self.mark_offset = offset
             self.mark_uses_count = 0
             self.mark_uses_index = -1
         else:
             self.mark = entity
+            self.mark_offset = offset
             self.mark_uses_count = len(self.uses_map[entity])
             self.mark_uses_index = self.uses_indexes_map[entity][-1]
 
-    def action_mark_push(self, entity: int) -> bool:
+    def action_mark_push(self, entity: int, offset: int) -> bool:
         if len(self.marks) == self.options.max_marks:
             return False
 
-        if lb.is_null_handle(entity) or not lb.is_use(entity):
+        if lb.is_null_handle(entity):
             # If the entity being pushed is not a use, add a mark anyway
             # This mark will be used for navigation only
-            self.marks.append(lb.get_null_handle())
-        elif lb.is_use(entity):
-            self.marks.append(entity)
+            self.marks.append((lb.get_null_handle(), offset))
+        else:
+            uses = []
+            if lb.is_use(entity):
+                uses = lb.entity_get_uses(lb.use_get_used(entity))
+            elif lb.is_def(entity):
+                uses = lb.entity_get_uses(lb.def_get_defined(entity))
+            elif lb.is_comdat(entity):
+                uses = [lb.comdat_get_target(entity)]
+            self.marks.append((entity, offset))
             if entity not in self.uses_indexes_map:
-                self.uses_map[entity] = lb.entity_get_uses(entity)
+                self.uses_map[entity] = uses
                 self.uses_indexes_map[entity] = []
-            self.uses_indexes_map[entity].append(
-                0 if self.uses_map[entity] else -1)
-        self.set_mark()
+            # FIXME: A better way to do this would be to set it to the use
+            # nearest the offset
+            self.uses_indexes_map[entity].append(0 if uses else -1)
+        self.set_mark(entity, offset)
         return True
 
     def action_mark_pop(self) -> bool:
@@ -244,15 +272,21 @@ class Application(Gtk.Application):
 
         # If there is at least one mark, pop it
         if self.marks:
-            entity = self.marks.pop()
+            entity, _ = self.marks.pop()
             # If the mark is actually a use, then remove all the metadata
             # associated with it if it is the last instance of the mark
             if not lb.is_null_handle(entity):
                 self.uses_indexes_map[entity].pop()
-                if len(self.uses_indexes_map) == 0:
+                if len(self.uses_indexes_map[entity]) == 0:
                     del self.uses_indexes_map[entity]
                     del self.uses_map[entity]
-        self.set_mark()
+        if self.marks:
+            self.set_mark(self.marks[-1][0], self.marks[-1][1])
+            # FIXME: When a mark is popped, move the cursor to the last seen use
+            # of the previous mark if any
+        else:
+            self.set_mark(lb.get_null_handle())
+
         return True
 
     def on_entity_changed(self, *args):
@@ -268,16 +302,38 @@ class Application(Gtk.Application):
                 self.entity_with_def = self.entity
 
     def on_instruction_changed(self, *args):
+        def has_source(inst):
+            if lb.inst_has_source_defn(inst):
+                # We don't want to allow "show-source" for instructions with 
+                # LLVM's debug or lifetime intrinsics. These can't really be 
+                # mapped to anything in the source. In any case, the "useful"
+                # information in those instructions is the LLVM value actually
+                # passed to the call, so no point in confusing matters by 
+                # allowing it to be mapped to the source
+                if lb.inst_is_llvm_debug_inst(inst) \
+                        or lb.inst_is_llvm_lifetime_inst(inst):
+                    return False
+                return True
+            return False
+
+        # If an instruction was set and it has source information, then 
+        # set the source entity to be that instruction. If not, then 
+        # set it to the containing function
+        self.entity_with_source = lb.get_null_handle()
         if self.inst:
-            if lb.inst_has_source_defn(self.inst):
-                self.entity_with_source = self.inst
             self.func = lb.inst_get_function(self.inst)
+            if has_source(self.inst):
+                self.entity_with_source = self.inst
+            elif lb.func_has_source_defn(self.func):
+                self.entity_with_source = self.func
 
     def on_function_changed(self, *args):
+        # If a function was set, then check if an instruction has also been
+        # set. If the instruction has not been set, then set the source entity
+        # to be the function if it has source information
         if self.func:
-            if not self.inst:
-                if lb.func_has_source_defn(self.func):
-                    self.entity_with_source = self.func
+            if (not self.inst) and lb.func_has_source_defn(self.func):
+                self.entity_with_source = self.func
 
     def run(self, argv: argparse.Namespace) -> int:
         self.argv = argv

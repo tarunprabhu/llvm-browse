@@ -490,7 +490,6 @@
                 <property name="receives_default">True</property>
                 <property name="use_underline">True</property>
                 <property name="use_stock">True</property>
-                <signal name="activate" handler="on_open" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">True</property>
@@ -685,13 +684,12 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkMenuItem" id="mitm_view_fullscreen">
+                      <object class="GtkCheckMenuItem" id="mitm_view_fullscreen">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Toggle fullscreen mode</property>
                         <property name="label" translatable="yes">_Fullscreen</property>
                         <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_toggle_fullscreen" swapped="no"/>
                         <accelerator key="F11" signal="activate"/>
                       </object>
                     </child>
@@ -713,6 +711,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_search_forward">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Search LLVM code forward from cursor</property>
                         <property name="label" translatable="yes">Search _forward</property>
@@ -724,6 +723,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_search_backward">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Search LLVM backward from cursor</property>
                         <property name="label" translatable="yes">Search _backward</property>
@@ -735,6 +735,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_search_contents">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="tooltip_text" translatable="yes">Search the contents bar</property>
                         <property name="label" translatable="yes">Search _contents</property>
@@ -746,6 +747,7 @@
                     <child>
                       <object class="GtkMenuItem" id="mitm_goto_line">
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">Goto line</property>
                         <property name="use_underline">True</property>
@@ -760,14 +762,51 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkMenuItem" id="mitm_goto_definition">
+                      <object class="GtkMenuItem" id="mitm_push_mark">
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">_Definition</property>
+                        <property name="tooltip_text" translatable="yes">Push a mark</property>
+                        <property name="label" translatable="yes">Push mark</property>
                         <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_goto_definition" swapped="no"/>
-                        <accelerator key="F2" signal="activate"/>
+                        <signal name="activate" handler="on_mark_push" swapped="no"/>
+                        <accelerator key="k" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mitm_pop_mark">
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Pop the most recent mark</property>
+                        <property name="label" translatable="yes">Pop mark</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_mark_pop" swapped="no"/>
+                        <accelerator key="l" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mitm_goto_prev_mark">
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Go to previous mark</property>
+                        <property name="label" translatable="yes">_Previous mark</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_goto_prev_mark" swapped="no"/>
+                        <accelerator key="F4" signal="activate" modifiers="GDK_SHIFT_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mitm_goto_next_mark">
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Go to next mark</property>
+                        <property name="label" translatable="yes">Ne_xt mark</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_goto_next_mark" swapped="no"/>
+                        <accelerator key="F4" signal="activate"/>
                       </object>
                     </child>
                     <child>
@@ -798,27 +837,14 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkMenuItem" id="mitm_go_back">
+                      <object class="GtkMenuItem" id="mitm_goto_definition">
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
-                        <property name="tooltip_text" translatable="yes">Go to previous cursor position</property>
-                        <property name="label" translatable="yes">_Back</property>
+                        <property name="label" translatable="yes">Go to _definition</property>
                         <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_go_back" swapped="no"/>
-                        <accelerator key="F4" signal="activate" modifiers="GDK_SHIFT_MASK"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="mitm_go_forward">
-                        <property name="visible">True</property>
-                        <property name="sensitive">False</property>
-                        <property name="can_focus">False</property>
-                        <property name="tooltip_text" translatable="yes">Go to next cursor position</property>
-                        <property name="label" translatable="yes">_Forward</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="on_go_forward" swapped="no"/>
-                        <accelerator key="F4" signal="activate"/>
+                        <signal name="activate" handler="on_goto_definition" swapped="no"/>
+                        <accelerator key="F2" signal="activate"/>
                       </object>
                     </child>
                     <child>
@@ -942,15 +968,15 @@
               </packing>
             </child>
             <child>
-              <object class="GtkToolButton" id="tlbtn_go_back">
+              <object class="GtkToolButton" id="tlbtn_goto_prev_mark">
                 <property name="visible">True</property>
                 <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Go to previous cursor position</property>
+                <property name="tooltip_text" translatable="yes">Go to previous mark</property>
                 <property name="label" translatable="yes">_Back</property>
                 <property name="use_underline">True</property>
                 <property name="stock_id">gtk-go-back</property>
-                <signal name="clicked" handler="on_go_back" swapped="no"/>
+                <signal name="clicked" handler="on_goto_prev_mark" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -958,15 +984,15 @@
               </packing>
             </child>
             <child>
-              <object class="GtkToolButton" id="tlbtn_go_forward">
+              <object class="GtkToolButton" id="tlbtn_goto_next_mark">
                 <property name="visible">True</property>
                 <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Go to next cursor position</property>
+                <property name="tooltip_text" translatable="yes">Go to next mark</property>
                 <property name="label" translatable="yes">_Forward</property>
                 <property name="use_underline">True</property>
                 <property name="stock_id">gtk-go-forward</property>
-                <signal name="clicked" handler="on_go_forward" swapped="no"/>
+                <signal name="clicked" handler="on_goto_next_mark" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -974,14 +1000,29 @@
               </packing>
             </child>
             <child>
-              <object class="GtkToolButton" id="tlbtn_goto_definition">
+              <object class="GtkToolButton" id="tlbtn_push_mark">
                 <property name="visible">True</property>
+                <property name="sensitive">False</property>
                 <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Go to definition</property>
-                <property name="label" translatable="yes">_Definition</property>
-                <property name="use_underline">True</property>
-                <property name="icon_name">go-home</property>
-                <signal name="clicked" handler="on_goto_definition" swapped="no"/>
+                <property name="tooltip_text" translatable="yes">Push mark</property>
+                <property name="label" translatable="yes">Push</property>
+                <property name="icon_name">list-add</property>
+                <signal name="clicked" handler="on_mark_push" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToolButton" id="tlbtn_pop_mark">
+                <property name="visible">True</property>
+                <property name="sensitive">False</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Pop mark</property>
+                <property name="label" translatable="yes">Pop</property>
+                <property name="icon_name">list-remove</property>
+                <signal name="clicked" handler="on_mark_pop" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -1026,6 +1067,21 @@
               <packing>
                 <property name="expand">False</property>
                 <property name="homogeneous">False</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToolButton" id="tlbtn_goto_definition">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Go to definition</property>
+                <property name="label" translatable="yes">_Definition</property>
+                <property name="use_underline">True</property>
+                <property name="icon_name">go-home</property>
+                <signal name="clicked" handler="on_goto_definition" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
               </packing>
             </child>
             <child>
@@ -1213,6 +1269,7 @@
                                     <property name="hexpand">True</property>
                                     <property name="vexpand">True</property>
                                     <property name="editable">False</property>
+                                    <property name="wrap_mode">word</property>
                                     <property name="left_margin">2</property>
                                     <property name="right_margin">2</property>
                                     <property name="monospace">True</property>
@@ -1220,6 +1277,7 @@
                                     <property name="smart_home_end">before</property>
                                     <property name="highlight_current_line">True</property>
                                     <property name="indent_on_tab">False</property>
+                                    <signal name="populate-popup" handler="on_srcvw_llvm_populate_popup" swapped="no"/>
                                   </object>
                                 </child>
                               </object>
@@ -1233,6 +1291,7 @@
                                 <property name="can_focus">False</property>
                                 <property name="halign">end</property>
                                 <property name="valign">start</property>
+                                <property name="show_close_button">True</property>
                                 <child>
                                   <object class="GtkSearchEntry" id="srch_llvm">
                                     <property name="visible">True</property>
@@ -1240,6 +1299,8 @@
                                     <property name="primary_icon_name">edit-find-symbolic</property>
                                     <property name="primary_icon_activatable">False</property>
                                     <property name="primary_icon_sensitive">False</property>
+                                    <signal name="activate" handler="on_search_go" swapped="no"/>
+                                    <signal name="stop-search" handler="on_search_stop" swapped="no"/>
                                   </object>
                                 </child>
                               </object>
@@ -1279,12 +1340,33 @@
                                 <property name="editable">False</property>
                                 <property name="left_margin">2</property>
                                 <property name="right_margin">2</property>
+                                <property name="overwrite">True</property>
+                                <property name="accepts_tab">False</property>
                                 <property name="show_line_numbers">True</property>
+                                <property name="show_line_marks">True</property>
                                 <property name="tab_width">4</property>
                                 <property name="smart_home_end">always</property>
                                 <property name="highlight_current_line">True</property>
                               </object>
                             </child>
+                          </object>
+                          <packing>
+                            <property name="left_attach">0</property>
+                            <property name="top_attach">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="lbl_source_filename">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="margin_left">8</property>
+                            <property name="margin_right">8</property>
+                            <property name="margin_top">8</property>
+                            <property name="margin_bottom">8</property>
+                            <property name="ellipsize">middle</property>
+                            <property name="single_line_mode">True</property>
+                            <property name="track_visited_links">False</property>
+                            <property name="xalign">0.5</property>
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
