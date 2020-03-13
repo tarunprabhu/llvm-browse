@@ -21,6 +21,7 @@ class Argument :
 protected:
   Function& parent;
   const llvm::DILocalVariable* di;
+  std::string source_name;
 
 protected:
   Argument(const llvm::Argument& llvm_arg, Function& f, Module& module);

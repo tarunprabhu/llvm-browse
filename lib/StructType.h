@@ -23,6 +23,7 @@ protected:
   llvm::StructType* llvm;
   std::string source_name;
   std::string full_name;
+  std::string qualified_name;
 
 protected:
   StructType(llvm::StructType* llvm, Module& module);
@@ -35,9 +36,12 @@ public:
 
   bool has_source_info() const;
   bool has_source_name() const;
+  bool has_full_name() const;
+  bool has_qualified_name() const;
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  llvm::StringRef get_qualified_name() const;
   bool is_artificial() const;
 
 public:

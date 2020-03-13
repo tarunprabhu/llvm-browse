@@ -1,4 +1,5 @@
 #include "Argument.h"
+#include "DIUtils.h"
 #include "Function.h"
 #include "Module.h"
 
@@ -22,6 +23,9 @@ Argument::Argument(const llvm::Argument& arg, Function& f, Module& module) :
 void
 Argument::set_debug_info_node(const llvm::DILocalVariable* di) {
   this->di = di;
+  if(di) {
+  	source_name = DebugInfo::get_name(di);
+  }
 }
 
 bool
@@ -36,7 +40,7 @@ Argument::has_source_name() const {
 
 llvm::StringRef
 Argument::get_source_name() const {
-  return has_source_info() ? di->getName() : llvm::StringRef("");
+  return source_name;
 }
 
 llvm::StringRef

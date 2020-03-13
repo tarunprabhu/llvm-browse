@@ -32,7 +32,15 @@ protected:
   const Comdat* comdat;
   const llvm::DISubprogram* di;
   std::string source_name;
+
+  // The full name will be the name obtained from the debug information 
+  // and for languages with mangled names will be demangled. For C++, this 
+  // will have all of the template parmaeters 
   std::string full_name;
+
+  // The qualified name for C++ will have all the template parameters stripped
+  // For other languages, this will be the same as the full name
+  std::string qualified_name;
 
 public:
   using ArgIterator   = DerefIterator<decltype(m_args)::const_iterator>;
@@ -50,9 +58,11 @@ public:
   bool has_source_info() const;
   bool has_source_name() const;
   bool has_full_name() const;
+  bool has_qualified_name() const;
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  llvm::StringRef get_qualified_name() const;
   const Comdat* get_comdat() const;
   bool is_mangled() const;
   bool is_artificial() const;

@@ -15,7 +15,7 @@ StructType::StructType(llvm::StructType* llvm, Module& module) :
   else
     critical() << "Cannot set tag for unnamed struct: " << *get_llvm() << "\n";
 
-  // TODO: Get the source name and the full name from the DebugInfo
+  // TODO: Get the source name, qualified name and full name from the DebugInfo
 }
 
 bool
@@ -34,6 +34,16 @@ StructType::has_source_name() const {
   return get_source_name().size();
 }
 
+bool
+StructType::has_full_name() const {
+  return get_full_name().size();
+}
+
+bool
+StructType::has_qualified_name() const {
+  return get_qualified_name().size();
+}
+
 llvm::StringRef
 StructType::get_source_name() const {
   return llvm::StringRef(source_name);
@@ -47,6 +57,11 @@ StructType::get_llvm_name() const {
 llvm::StringRef
 StructType::get_full_name() const {
   return llvm::StringRef(full_name);
+}
+
+llvm::StringRef
+StructType::get_qualified_name() const {
+  return llvm::StringRef(qualified_name);
 }
 
 bool

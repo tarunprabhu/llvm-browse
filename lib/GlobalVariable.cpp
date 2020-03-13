@@ -36,8 +36,9 @@ GlobalVariable::GlobalVariable(const llvm::GlobalVariable& llvm_g,
         SourceRange(module.get_full_path(di->getDirectory(), di->getFilename()),
                     di->getLine(),
                     1));
-    source_name = DebugInfo::get_name(di);
-    full_name   = DebugInfo::get_full_name(di);
+    source_name    = DebugInfo::get_name(di);
+    full_name      = DebugInfo::get_full_name(di);
+    qualified_name = DebugInfo::get_qualified_name(di);
   } else if(dis.size() > 1) {
     warning() << "Could not find unique debug info for global: " << llvm_g
               << "\n";
@@ -59,6 +60,11 @@ GlobalVariable::has_full_name() const {
   return get_full_name().size();
 }
 
+bool
+GlobalVariable::has_qualified_name() const {
+	return get_qualified_name().size();
+}
+
 llvm::StringRef
 GlobalVariable::get_source_name() const {
   return llvm::StringRef(source_name);
@@ -67,6 +73,11 @@ GlobalVariable::get_source_name() const {
 llvm::StringRef
 GlobalVariable::get_llvm_name() const {
   return get_llvm().getName();
+}
+
+llvm::StringRef
+GlobalVariable::get_qualified_name() const {
+	return llvm::StringRef(qualified_name);
 }
 
 llvm::StringRef

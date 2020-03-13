@@ -25,7 +25,7 @@ public:
   }
 
   reference operator[](size_t n) const {
-    return *(this->BaseOperator::operator[](n));
+    return *(this->BaseIterator::operator[](n));
   }
 };
 

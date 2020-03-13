@@ -397,7 +397,7 @@ module_get_code(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_aliases(PyObject* self, PyObject* args) {
   const auto& module = get_object<lb::Module>(parse_handle(args));
-  PyObject* aliases        = PyList_New(0);
+  PyObject* aliases  = PyList_New(0);
   for(const lb::GlobalAlias& alias : module.aliases())
     PyList_Append(aliases, get_py_handle(alias, HandleKind::GlobalAlias));
 
@@ -408,7 +408,7 @@ module_get_aliases(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_comdats(PyObject* self, PyObject* args) {
   const auto& module = get_object<lb::Module>(parse_handle(args));
-  PyObject* comdats        = PyList_New(0);
+  PyObject* comdats  = PyList_New(0);
   for(const lb::Comdat& comdat : module.comdats())
     PyList_Append(comdats, get_py_handle(comdat, HandleKind::Comdat));
 
@@ -418,8 +418,8 @@ module_get_comdats(PyObject* self, PyObject* args) {
 
 static PyObject*
 module_get_functions(PyObject* self, PyObject* args) {
-  const auto& module = get_object<lb::Module>(parse_handle(args));
-  PyObject* functions      = PyList_New(0);
+  const auto& module  = get_object<lb::Module>(parse_handle(args));
+  PyObject* functions = PyList_New(0);
   for(const lb::Function& f : module.functions())
     PyList_Append(functions, get_py_handle(f, HandleKind::Function));
 
@@ -430,7 +430,7 @@ module_get_functions(PyObject* self, PyObject* args) {
 static PyObject*
 module_get_globals(PyObject* self, PyObject* args) {
   const auto& module = get_object<lb::Module>(parse_handle(args));
-  PyObject* globals        = PyList_New(0);
+  PyObject* globals  = PyList_New(0);
   for(const lb::GlobalVariable& g : module.globals())
     PyList_Append(globals, get_py_handle(g, HandleKind::GlobalVariable));
 
@@ -442,7 +442,7 @@ static PyObject*
 module_get_structs(PyObject* self, PyObject* args) {
 
   const auto& module = get_object<lb::Module>(parse_handle(args));
-  PyObject* structs        = PyList_New(0);
+  PyObject* structs  = PyList_New(0);
   for(const lb::StructType& s : module.structs())
     PyList_Append(structs, get_py_handle(s, HandleKind::StructType));
 
@@ -741,8 +741,8 @@ block_is_artificial(PyObject* self, PyObject* args) {
 
 static PyObject*
 block_get_instructions(PyObject* self, PyObject* args) {
-  const auto& bb = get_object<lb::BasicBlock>(parse_handle(args));
-  PyObject* insts          = PyList_New(0);
+  const auto& bb  = get_object<lb::BasicBlock>(parse_handle(args));
+  PyObject* insts = PyList_New(0);
   for(const lb::Instruction& inst : bb.instructions())
     PyList_Append(insts, get_py_handle(inst, HandleKind::Instruction));
 
@@ -871,6 +871,12 @@ func_get_full_name(PyObject* self, PyObject* args) {
 }
 
 static PyObject*
+func_get_qualified_name(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::Function>(parse_handle(args)).get_qualified_name());
+}
+
+static PyObject*
 func_has_source_info(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::Function>(parse_handle(args)).has_source_info());
@@ -888,8 +894,8 @@ func_is_mangled(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_args(PyObject* self, PyObject* args) {
-  const auto& f = get_object<lb::Function>(parse_handle(args));
-  PyObject* arguments   = PyList_New(0);
+  const auto& f       = get_object<lb::Function>(parse_handle(args));
+  PyObject* arguments = PyList_New(0);
   for(const lb::Argument& arg : f.arguments())
     PyList_Append(arguments, get_py_handle(arg, HandleKind::Argument));
 
@@ -899,8 +905,8 @@ func_get_args(PyObject* self, PyObject* args) {
 
 static PyObject*
 func_get_blocks(PyObject* self, PyObject* args) {
-  const auto& f = get_object<lb::Function>(parse_handle(args));
-  PyObject* blocks      = PyList_New(0);
+  const auto& f    = get_object<lb::Function>(parse_handle(args));
+  PyObject* blocks = PyList_New(0);
   for(const lb::BasicBlock& bb : f.blocks())
     PyList_Append(blocks, get_py_handle(bb, HandleKind::BasicBlock));
 
@@ -988,6 +994,12 @@ static PyObject*
 global_get_full_name(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::GlobalVariable>(parse_handle(args)).get_full_name());
+}
+
+static PyObject*
+global_get_qualified_name(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::GlobalVariable>(parse_handle(args)).get_qualified_name());
 }
 
 static PyObject*
@@ -1236,6 +1248,12 @@ struct_get_full_name(PyObject* self, PyObject* args) {
 }
 
 static PyObject*
+struct_get_qualified_name(PyObject* self, PyObject* args) {
+  return convert(
+      get_object<lb::StructType>(parse_handle(args)).get_qualified_name());
+}
+
+static PyObject*
 struct_has_source_info(PyObject* self, PyObject* args) {
   return convert(
       get_object<lb::StructType>(parse_handle(args)).has_source_info());
@@ -1392,21 +1410,21 @@ static PyObject*
 entity_has_source_defn(PyObject* self, PyObject* args) {
   Handle handle = parse_handle(args);
   switch(get_handle_kind(handle)) {
-    case HandleKind::Argument:
+  case HandleKind::Argument:
     return arg_has_source_defn(self, args);
-    case HandleKind::BasicBlock:
+  case HandleKind::BasicBlock:
     return block_has_source_defn(self, args);
-    case HandleKind::Function:
+  case HandleKind::Function:
     return func_has_source_defn(self, args);
-    case HandleKind::GlobalVariable:
+  case HandleKind::GlobalVariable:
     return global_has_source_defn(self, args);
-    case HandleKind::Instruction:
+  case HandleKind::Instruction:
     return global_has_source_defn(self, args);
-    case HandleKind::StructType:
+  case HandleKind::StructType:
     return struct_has_source_defn(self, args);
-    default:
+  default:
     lb::warning() << "Could not check if entity has source definition: "
-    << get_handle_kind_name(handle) << "\n";
+                  << get_handle_kind_name(handle) << "\n";
     break;
   }
 
@@ -1608,6 +1626,8 @@ static PyObject*
 entity_get_full_name(PyObject* self, PyObject* args) {
   Handle handle = parse_handle(args);
   switch(get_handle_kind(handle)) {
+  case HandleKind::Argument:
+    return convert(llvm::StringRef(""));
   case HandleKind::Function:
     return func_get_full_name(self, args);
   case HandleKind::GlobalVariable:
@@ -1616,6 +1636,27 @@ entity_get_full_name(PyObject* self, PyObject* args) {
     return struct_get_full_name(self, args);
   default:
     lb::warning() << "Cannot get full name for entity: "
+                  << get_handle_kind_name(handle) << "\n";
+    break;
+  }
+
+  return convert(llvm::StringRef());
+}
+
+static PyObject*
+entity_get_qualified_name(PyObject* self, PyObject* args) {
+  Handle handle = parse_handle(args);
+  switch(get_handle_kind(handle)) {
+  case HandleKind::Argument:
+    return convert(llvm::StringRef(""));
+  case HandleKind::Function:
+    return func_get_qualified_name(self, args);
+  case HandleKind::GlobalVariable:
+    return global_get_qualified_name(self, args);
+  case HandleKind::StructType:
+    return struct_get_qualified_name(self, args);
+  default:
+    lb::warning() << "Cannot get qualified name for entity: "
                   << get_handle_kind_name(handle) << "\n";
     break;
   }
@@ -1796,6 +1837,7 @@ static PyMethodDef module_methods[] = {
     FUNC(func_get_llvm_name, "LLVM name of the function"),
     FUNC(func_get_source_name, "Source name of the function"),
     FUNC(func_get_full_name, "Full name of the function"),
+    FUNC(func_get_qualified_name, "Qualified name of the function"),
     FUNC(func_has_source_info,
          "True if the function has source information attached"),
     FUNC(func_is_artificial,
@@ -1821,6 +1863,7 @@ static PyMethodDef module_methods[] = {
     FUNC(global_get_tag, "Tag of the global"),
     FUNC(global_get_llvm_name, "LLVM name of the global"),
     FUNC(global_get_source_name, "Source name of the global"),
+    FUNC(global_get_qualified_name, "Qualified name of the global"),
     FUNC(global_has_source_info,
          "True if the global variable has source information attached"),
     FUNC(global_is_artificial,
@@ -1876,6 +1919,7 @@ static PyMethodDef module_methods[] = {
     FUNC(struct_get_llvm_name, "LLVM name of the struct"),
     FUNC(struct_get_source_name, "Source name of the struct"),
     FUNC(struct_get_full_name, "Full name of the struct"),
+    FUNC(struct_get_qualified_name, "Qualified name of the struct"),
     FUNC(struct_has_source_info,
          "True if the struct has source information attached"),
     FUNC(struct_is_artificial,
@@ -1905,6 +1949,7 @@ static PyMethodDef module_methods[] = {
     FUNC(entity_get_llvm_name, "LLVM name of the entity"),
     FUNC(entity_get_source_name, "Source name of the entity"),
     FUNC(entity_get_full_name, "Full name of the entity"),
+    FUNC(entity_get_qualified_name, "Qualified name of the entity"),
     FUNC(entity_has_source_info,
          "True if the entity has source information attached"),
     FUNC(entity_is_artificial,

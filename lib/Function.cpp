@@ -30,8 +30,9 @@ Function::Function(const llvm::Function& llvm_f, Module& module) :
 
   set_tag(llvm_f.getName(), "@");
   if(di) {
-    source_name = DebugInfo::get_name(di);
-    full_name   = DebugInfo::get_full_name(di);
+    source_name    = DebugInfo::get_name(di);
+    full_name      = DebugInfo::get_full_name(di);
+    qualified_name = DebugInfo::get_qualified_name(di);
     set_source_defn(
         SourceRange(module.get_full_path(di->getDirectory(), di->getFilename()),
                     di->getLine(),
@@ -54,6 +55,11 @@ Function::has_full_name() const {
   return get_full_name().size();
 }
 
+bool
+Function::has_qualified_name() const {
+  return get_qualified_name().size();
+}
+
 llvm::StringRef
 Function::get_source_name() const {
   return llvm::StringRef(source_name);
@@ -62,6 +68,11 @@ Function::get_source_name() const {
 llvm::StringRef
 Function::get_full_name() const {
   return llvm::StringRef(full_name);
+}
+
+llvm::StringRef
+Function::get_qualified_name() const {
+  return llvm::StringRef(qualified_name);
 }
 
 llvm::StringRef
@@ -169,10 +180,10 @@ Function::arguments() const {
 
 Function&
 Function::make(const llvm::Function& llvm_f, Module& module) {
-  auto *f = new Function(llvm_f, module);
+  auto* f = new Function(llvm_f, module);
   if(llvm_f.size())
     module.m_functions.emplace_back(f);
-  else 
+  else
     module.m_decls.emplace_back(f);
   module.vmap[&llvm_f] = f;
 

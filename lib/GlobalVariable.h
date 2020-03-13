@@ -24,6 +24,7 @@ protected:
   const llvm::DIGlobalVariable* di;
   std::string source_name;
   std::string full_name;
+  std::string qualified_name;
 
 protected:
   GlobalVariable(const llvm::GlobalVariable& llvm_g, Module& module);
@@ -36,10 +37,12 @@ public:
 
   bool has_source_info() const;
   bool has_source_name() const;
+  bool has_qualified_name() const;
   bool has_full_name() const;
   llvm::StringRef get_source_name() const;
   llvm::StringRef get_llvm_name() const;
   llvm::StringRef get_full_name() const;
+  llvm::StringRef get_qualified_name() const;
   const Comdat* get_comdat() const;
   bool is_artificial() const;
   bool is_mangled() const;

@@ -10,20 +10,25 @@ namespace lb {
 namespace DebugInfo {
 
 std::string
-get_name(const llvm::DINamespace*);
+get_name(const llvm::DINamespace* di, bool keep_templates=true);
 std::string
-get_name(const llvm::DICompositeType*);
+get_name(const llvm::DICompositeType*, bool keep_templates=true);
 std::string
-get_name(const llvm::DILocalVariable*);
+get_name(const llvm::DILocalVariable*, bool keep_templates=true);
 std::string
-get_name(const llvm::DIGlobalVariable*);
+get_name(const llvm::DIGlobalVariable*, bool keep_templates=true);
 std::string
-get_name(const llvm::DISubprogram*);
+get_name(const llvm::DISubprogram*, bool keep_templates=true);
 
 std::string
 get_full_name(const llvm::DISubprogram*);
 std::string
 get_full_name(const llvm::DIGlobalVariable*);
+
+std::string
+get_qualified_name(const llvm::DISubprogram*);
+std::string
+get_qualified_name(const llvm::DIGlobalVariable*);
 
 } // namespace DebugInfo
 
